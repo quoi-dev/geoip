@@ -1,0 +1,380 @@
+use std::{fs, io};
+use std::ffi::OsStr;
+use std::net::IpAddr;
+use std::path::{Path, PathBuf};
+use std::sync::{Arc, Weak};
+use std::time::Duration;
+use ahash::AHashMap;
+use arc_swap::ArcSwapOption;
+use chrono::{DateTime, Utc};
+use filetime::{set_file_mtime, FileTime};
+use flate2::read::GzDecoder;
+use log::{error, info, warn};
+use maxminddb::{geoip2, MaxMindDbError};
+use reqwest::{header, Client, StatusCode};
+use tempfile::NamedTempFile;
+use thiserror::Error;
+use tokio::io::AsyncWriteExt;
+use tokio::time::MissedTickBehavior;
+use crate::config::{AppConfig, DOWNLOAD_URL_EDITION_PLACEHOLDER};
+use crate::model::{GeoIpDatabaseStatus, GeoIpInfo, GeoIpStatus, GeoNameSubdivision};
+
+#[derive(Debug, Error)]
+pub enum MaxMindServiceError {
+	#[error(transparent)]
+	Io(#[from] io::Error),
+	
+	#[error(transparent)]
+	MaxMindDb(#[from] MaxMindDbError),
+	
+	#[error(transparent)]
+	Reqwest(#[from] reqwest::Error),
+	
+	#[error(transparent)]
+	JoinError(#[from] tokio::task::JoinError),
+	
+	#[error("Unknown MaxMind database edition")]
+	UnknownEdition,
+	
+	#[error("MaxMind database is missing")]
+	MissingDatabase,
+	
+	#[error("HTTP error (status={0})")]
+	HttpError(StatusCode),
+}
+
+struct MaxMindDbReader {
+	path: PathBuf,
+	reader: maxminddb::Reader<maxminddb::Mmap>,
+}
+
+pub struct MaxMindService {
+	me: Weak<Self>,
+	config: Arc<AppConfig>,
+	client: Client,
+	readers: AHashMap<String, ArcSwapOption<MaxMindDbReader>>,
+}
+
+impl MaxMindService {
+	pub fn new(config: Arc<AppConfig>, client: Client) -> Arc<Self> {
+		let readers = Self::load_all_latest(&config);
+		
+		Arc::new_cyclic(|me| Self {
+			me: me.clone(),
+			config,
+			client,
+			readers,
+		})
+	}
+	
+	fn load_all_latest(
+		config: &AppConfig,
+	) -> AHashMap<String, ArcSwapOption<MaxMindDbReader>> {
+		let mut out = AHashMap::new();
+		for edition in &config.maxmind_editions {
+			let reader = match Self::load_latest(config, &edition) {
+				Ok(reader) => Some(reader),
+				Err(err) => {
+					warn!("Unable to open MaxMind {edition} database: {err}");
+					None
+				}
+			};
+			out.insert(edition.clone(), ArcSwapOption::from(reader));
+		}
+		out
+	}
+	
+	fn load_latest(
+		config: &AppConfig,
+		edition: &str,
+	) -> Result<Arc<MaxMindDbReader>, MaxMindServiceError> {
+		let mut latest_path = None;
+		for entry in fs::read_dir(&config.data_dir.join(edition))? {
+			let entry = entry?;
+			let path = entry.path();
+			let ext = path.extension().and_then(OsStr::to_str);
+			if ext != Some("mmdb")  {
+				continue;
+			}
+			if let Some(latest_path) = &latest_path {
+				if &path < latest_path {
+					continue;
+				}
+			}
+			latest_path = Some(path);
+		}
+		let path = latest_path.ok_or_else(|| MaxMindServiceError::MissingDatabase)?;
+		info!("Opening MaxMind database {:?}", path);
+		let reader = maxminddb::Reader::open_mmap(&path)?;
+		info!(
+			"Opened MaxMind database (type={}, build_epoch={})",
+			reader.metadata.database_type,
+			reader.metadata.build_epoch,
+		);
+		// TODO: Remove outdated files
+		Ok(Arc::new(MaxMindDbReader {
+			path,
+			reader,
+		}))
+	}
+	
+	pub fn start_updater(&self) {
+		let me = self.me.upgrade().expect("Unable to upgrade me");
+		if !self.config.auto_update {
+			info!("Auto-update is disabled");
+			return;
+		}
+		tokio::task::spawn(async move {
+			info!("Started background auto-updater");
+			let mut interval = tokio::time::interval(Duration::from_hours(24));
+			interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
+			loop {
+				interval.tick().await;
+				me.update_all().await;
+			}
+		});
+	}
+	
+	async fn update_all(&self) {
+		info!("Updating all databases");
+		for edition in &self.config.maxmind_editions {
+			let _ = self.update(edition).await;
+		}
+	}
+	
+	async fn update(&self, edition: &str) -> Result<(), MaxMindServiceError> {
+		info!("Updating {edition}...");
+		let out_reader = self.readers
+			.get(edition)
+			.ok_or(MaxMindServiceError::UnknownEdition)?;
+		let path = self.download(edition).await?;
+		let Some(path) = path else { return Ok(()) };
+		let reader = match maxminddb::Reader::open_mmap(&path) {
+			Ok(reader) => reader,
+			Err(err) => {
+				error!("Unable to open {}: {err}", path.display());
+				if let Err(err) = tokio::fs::remove_file(&path).await {
+					error!("Unable to remove corrupted MaxMind database {}: {err}", path.display());
+				}
+				return Err(err.into());
+			}
+		};
+		let old = out_reader.swap(Some(Arc::new(MaxMindDbReader {
+			path: path.clone(),
+			reader,
+		})));
+		info!("Using {}", path.display());
+		Self::wait_unused_and_cleanup(old).await;
+		Ok(())
+	}
+	
+	async fn wait_unused_and_cleanup(reader: Option<Arc<MaxMindDbReader>>) {
+		let Some(reader) = reader else { return };
+		let path = reader.path.clone();
+		let weak = Arc::downgrade(&reader);
+		drop(reader);
+		while weak.upgrade().is_some() {
+			tokio::time::sleep(Duration::from_millis(100)).await;
+		}
+		Self::cleanup(&path);
+	}
+	
+	fn cleanup(path: &Path) {
+		if let Err(err) = fs::remove_file(&path) {
+			error!("Unable to delete outdated MaxMind database {}: {err}", path.display());
+		} else {
+			info!("Deleted outdated MaxMind database {}", path.display());
+		}
+		let archive_path = path.with_added_extension("tar.gz");
+		if let Err(err) = fs::remove_file(&archive_path) {
+			error!("Unable to remove outdated MaxMind database archive {}: {err}", archive_path.display());
+		} else {
+			info!("Removed outdated MaxMind database archive {}", archive_path.display());
+		}
+	}
+	
+	async fn download(
+		&self,
+		edition: &str,
+	) -> Result<Option<PathBuf>, MaxMindServiceError> {
+		let mtime = self.get_edition_mtime(edition);
+		let url = self.make_download_url(edition);
+		let dir = self.config.data_dir.join(edition);
+		tokio::fs::create_dir_all(&dir).await?;
+		let mut req = self.client.get(&url);
+		if let Some(username) = &self.config.maxmind_account_id {
+			info!("Using HTTP basic auth");
+			req = req.basic_auth(username, self.config.maxmind_license_key.as_ref());
+		}
+		if let Some(mtime) = mtime {
+			let mtime_str = mtime.to_rfc2822();
+			info!("Using If-Modified-Since: {mtime_str}");
+			req = req.header(header::IF_MODIFIED_SINCE, mtime_str);
+		}
+		info!("Downloading {url}...");
+		let mut res = req.send().await?;
+		let status = res.status();
+		if status == StatusCode::NOT_MODIFIED {
+			if let Some(mtime) = mtime {
+				info!("{url} wasn't modified since {mtime}");
+			} else {
+				info!("{url} wasn't modified");
+			}
+			return Ok(None);
+		}
+		if !status.is_success() {
+			info!("Unable to retrieve {url} with HTTP status {status}");
+			return Err(MaxMindServiceError::HttpError(status));
+		}
+		let out_mtime = res.headers()
+			.get(header::LAST_MODIFIED)
+			.and_then(|s| s.to_str().ok())
+			.and_then(|s| DateTime::parse_from_rfc2822(s).ok())
+			.map(|t| t.to_utc())
+			.unwrap_or_else(|| Utc::now());
+		info!("Last modified: {}", out_mtime.to_rfc2822());
+		let file = NamedTempFile::new_in(&dir)?;
+		let (file, tmp_path) = file.into_parts();
+		let mut file = tokio::fs::File::from_std(file);
+		let mut received_length: u64 = 0;
+		while let Some(chunk) = res.chunk().await? {
+			file.write_all(&chunk).await?;
+			received_length += chunk.len() as u64;
+		}
+		info!("Downloaded {received_length} bytes from {url}");
+		let file = NamedTempFile::from_parts(file.into_std().await, tmp_path);
+		let out_timestamp_str = out_mtime.format("%Y%m%d%H%M%S").to_string();
+		let archive_path = dir.join(format!("{edition}-{out_timestamp_str}.mmdb.tar.gz"));
+		let out_path = dir.join(format!("{edition}-{out_timestamp_str}.mmdb"));
+		file.persist(&archive_path).map_err(|err| err.error)?;
+		info!("Downloaded {url} into {}", archive_path.display());
+		let cloned_out_path = out_path.clone();
+		let cloned_archive_path = archive_path.clone();
+		let res = tokio::task::spawn_blocking(move || {
+			Self::extract_mmdb(&cloned_archive_path, &cloned_out_path)
+		}).await??;
+		if !res {
+			return Ok(None);
+		}
+		set_file_mtime(&out_path, FileTime::from_unix_time(out_mtime.timestamp(), 0))?;
+		set_file_mtime(&archive_path, FileTime::from_unix_time(out_mtime.timestamp(), 0))?;
+		Ok(Some(out_path))
+	}
+	
+	fn extract_mmdb(
+		archive_path: &Path,
+		out_path: &Path,
+	) -> Result<bool, MaxMindServiceError> {
+		let mut file = fs::File::open(archive_path)?;
+		let gz = GzDecoder::new(&mut file);
+		let mut archive = tar::Archive::new(gz);
+		for entry in archive.entries()? {
+			let mut entry = entry?;
+			let path = entry.path()?;
+			if path.extension().and_then(OsStr::to_str) == Some("mmdb") {
+				info!("Extracting {}...", path.display());
+				entry.unpack(out_path)?;
+				return Ok(true);
+			}
+		}
+		Ok(false)
+	}
+	
+	fn get_edition_mtime(&self, edition: &str) -> Option<DateTime<Utc>> {
+		let reader = self.readers.get(edition)?;
+		let reader = reader.load_full()?;
+		// TODO: Parse mtime from filename
+		let metadata = fs::metadata(&reader.path).ok()?;
+		let modified = metadata.modified().ok()?;
+		Some(modified.into())
+	}
+	
+	fn make_download_url(&self, edition: &str) -> String {
+		self.config.maxmind_download_url.replace(
+			DOWNLOAD_URL_EDITION_PLACEHOLDER,
+			edition,
+		)
+	}
+	
+	pub fn status(&self) -> GeoIpStatus {
+		let databases = self.config.maxmind_editions
+			.iter()
+			.map(|edition| GeoIpDatabaseStatus {
+				edition: edition.clone(),
+				timestamp: self.get_edition_timestamp(edition),
+			})
+			.collect();
+		GeoIpStatus {
+			databases,
+		}
+	}
+	
+	pub fn lookup(
+		&self,
+		ip: IpAddr,
+		locale: &str,
+		edition: Option<&str>,
+	) -> Result<Option<GeoIpInfo>, MaxMindServiceError> {
+		let reader = self.get_reader(edition)?;
+		let res = reader.reader.lookup::<geoip2::Enterprise>(ip)?;
+		let Some(res) = res else { return Ok(None) };
+		Ok(Some(GeoIpInfo {
+			continent_id: res.continent.as_ref().and_then(|c| c.geoname_id),
+			continent_code: res.continent.as_ref().and_then(|c| c.code).map(str::to_owned),
+			continent_name: res.continent
+				.as_ref()
+				.and_then(|c| c.names.as_ref())
+				.and_then(|c| c.get(locale))
+				.map(|c| (*c).to_owned()),
+			country_id: res.country.as_ref().and_then(|c| c.geoname_id),
+			country_iso_code: res.country.as_ref().and_then(|c| c.iso_code).map(str::to_owned),
+			country_name: res.country.as_ref()
+				.and_then(|c| c.names.as_ref())
+				.and_then(|c| c.get(locale))
+				.map(|c| (*c).to_owned()),
+			subdivisions: res.subdivisions.iter().flatten().map(|s| GeoNameSubdivision {
+				id: s.geoname_id,
+				iso_code: s.iso_code.map(str::to_owned),
+				name: s.names.as_ref()
+					.and_then(|n| n.get(locale))
+					.map(|n| (*n).to_owned()),
+			}).collect(),
+			city_id: res.city.as_ref().and_then(|c| c.geoname_id),
+			city_name: res.city.as_ref()
+				.and_then(|c| c.names.as_ref())
+				.and_then(|c| c.get(locale))
+				.map(|c| (*c).to_owned()),
+			metro_code: res.location.as_ref().and_then(|c| c.metro_code),
+			postal_code: res.postal.as_ref().and_then(|c| c.code).map(str::to_owned),
+			timezone: res.location.as_ref().and_then(|c| c.time_zone).map(str::to_owned),
+			latitude: res.location.as_ref().and_then(|c| c.latitude),
+			longitude: res.location.as_ref().and_then(|c| c.longitude),
+			accuracy_radius: res.location.as_ref().and_then(|c| c.accuracy_radius),
+			is_in_european_union: res.country.as_ref().and_then(|c| c.is_in_european_union),
+			is_anonymous_proxy: res.traits.as_ref().and_then(|c| c.is_anonymous_proxy),
+			is_anycast: res.traits.as_ref().and_then(|c| c.is_anycast),
+			is_satellite_provider: res.traits.as_ref().and_then(|c| c.is_satellite_provider),
+		}))
+	}
+	
+	fn get_edition_timestamp(&self, edition: &str) -> Option<DateTime<Utc>> {
+		let reader = self.readers.get(edition)?;
+		reader.load()
+			.as_ref()
+			.and_then(|r| r.reader.metadata.build_epoch.try_into().ok())
+			.and_then(DateTime::from_timestamp_secs)
+	}
+	
+	fn get_reader(
+		&self,
+		edition: Option<&str>,
+	) -> Result<Arc<MaxMindDbReader>, MaxMindServiceError> {
+		let reader = edition
+			.or(self.config.maxmind_editions.first().map(String::as_str))
+			.and_then(|edition| self.readers.get(edition))
+			.ok_or(MaxMindServiceError::UnknownEdition)?
+			.load_full()
+			.ok_or(MaxMindServiceError::MissingDatabase)?;
+		Ok(reader)
+	}
+}
