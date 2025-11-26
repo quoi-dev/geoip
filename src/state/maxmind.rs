@@ -355,6 +355,15 @@ impl MaxMindService {
 		edition: Option<&str>,
 	) -> Result<Option<GeoIpInfo>, MaxMindServiceError> {
 		let reader = self.get_reader(edition)?;
+		if reader.reader.metadata.database_type == "GeoLite2-ASN" {
+			let res = reader.reader.lookup::<geoip2::Asn>(ip)?;
+			let Some(res) = res else { return Ok(None) };
+			return Ok(Some(GeoIpInfo {
+				autonomous_system_number: res.autonomous_system_number,
+				autonomous_system_organization: res.autonomous_system_organization.map(str::to_owned),
+				..Default::default()
+			}));
+		}
 		let res = reader.reader.lookup::<geoip2::Enterprise>(ip)?;
 		let Some(res) = res else { return Ok(None) };
 		Ok(Some(GeoIpInfo {

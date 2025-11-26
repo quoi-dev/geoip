@@ -34,7 +34,7 @@ pub struct GeoIpLookupResult {
 	pub elapsed: f32,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Default, Serialize)]
 pub struct GeoIpInfo {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub continent_id: Option<u32>,
