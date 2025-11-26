@@ -6,7 +6,7 @@ use std::sync::{Arc, LazyLock, Weak};
 use std::time::Duration;
 use ahash::AHashMap;
 use arc_swap::ArcSwapOption;
-use chrono::{DateTime, NaiveDateTime, Utc};
+use chrono::{DateTime, NaiveDateTime, TimeDelta, Utc};
 use flate2::read::GzDecoder;
 use log::{error, info, warn};
 use maxminddb::{geoip2, MaxMindDbError};
@@ -167,7 +167,18 @@ impl MaxMindService {
 	
 	async fn update_all(&self) {
 		info!("Updating all databases");
+		let now = Utc::now();
+		let min_time_delta = TimeDelta::hours(self.config.auto_update_interval as i64);
 		for edition in &self.config.maxmind_editions {
+			if let Some(mtime) = self.get_edition_mtime(edition) {
+				if now.signed_duration_since(mtime) < min_time_delta {
+					info!(
+						"Skipping update for {edition}, because it is newer than {} hour(s)",
+						self.config.auto_update_interval,
+					);
+					continue;
+				}
+			}
 			let _ = self.update(edition).await;
 		}
 	}
