@@ -2,15 +2,15 @@ use std::{fs, io};
 use std::ffi::OsStr;
 use std::net::IpAddr;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Weak};
+use std::sync::{Arc, LazyLock, Weak};
 use std::time::Duration;
 use ahash::AHashMap;
 use arc_swap::ArcSwapOption;
-use chrono::{DateTime, Utc};
-use filetime::{set_file_mtime, FileTime};
+use chrono::{DateTime, NaiveDateTime, Utc};
 use flate2::read::GzDecoder;
 use log::{error, info, warn};
 use maxminddb::{geoip2, MaxMindDbError};
+use regex::Regex;
 use reqwest::{header, Client, StatusCode};
 use tempfile::NamedTempFile;
 use thiserror::Error;
@@ -55,6 +55,10 @@ pub struct MaxMindService {
 	readers: AHashMap<String, ArcSwapOption<MaxMindDbReader>>,
 }
 
+static MMDB_FILENAME_PATTERN: LazyLock<Regex> = LazyLock::new(|| Regex::new(
+	"^([A-Za-z0-9-]+)-([0-9]{14}).mmdb$"
+).expect("Unable to compile regex"));
+
 impl MaxMindService {
 	pub fn new(config: Arc<AppConfig>, client: Client) -> Arc<Self> {
 		let readers = Self::load_all_latest(&config);
@@ -70,40 +74,36 @@ impl MaxMindService {
 	fn load_all_latest(
 		config: &AppConfig,
 	) -> AHashMap<String, ArcSwapOption<MaxMindDbReader>> {
+		let databases = Self::enumerate_databases(&config);
 		let mut out = AHashMap::new();
 		for edition in &config.maxmind_editions {
-			let reader = match Self::load_latest(config, &edition) {
-				Ok(reader) => Some(reader),
-				Err(err) => {
-					warn!("Unable to open MaxMind {edition} database: {err}");
-					None
+			let mut reader = None;
+			if let Some(versions) = databases.get(edition) {
+				for (_, path) in versions.iter().rev() {
+					if reader.is_some() {
+						Self::cleanup(path);
+						continue;
+					}
+					match Self::load(path) {
+						Ok(r) => {
+							reader = Some(r);
+						}
+						Err(err) => {
+							warn!("Unable to open MaxMind {edition} database: {err}");
+							Self::cleanup(path);
+						}
+					}
 				}
-			};
+			}
+			if reader.is_none() {
+				warn!("No available versions for {edition} MaxMind database");
+			}
 			out.insert(edition.clone(), ArcSwapOption::from(reader));
 		}
 		out
 	}
 	
-	fn load_latest(
-		config: &AppConfig,
-		edition: &str,
-	) -> Result<Arc<MaxMindDbReader>, MaxMindServiceError> {
-		let mut latest_path = None;
-		for entry in fs::read_dir(&config.data_dir.join(edition))? {
-			let entry = entry?;
-			let path = entry.path();
-			let ext = path.extension().and_then(OsStr::to_str);
-			if ext != Some("mmdb")  {
-				continue;
-			}
-			if let Some(latest_path) = &latest_path {
-				if &path < latest_path {
-					continue;
-				}
-			}
-			latest_path = Some(path);
-		}
-		let path = latest_path.ok_or_else(|| MaxMindServiceError::MissingDatabase)?;
+	fn load(path: &Path) -> Result<Arc<MaxMindDbReader>, MaxMindServiceError> {
 		info!("Opening MaxMind database {:?}", path);
 		let reader = maxminddb::Reader::open_mmap(&path)?;
 		info!(
@@ -111,11 +111,37 @@ impl MaxMindService {
 			reader.metadata.database_type,
 			reader.metadata.build_epoch,
 		);
-		// TODO: Remove outdated files
 		Ok(Arc::new(MaxMindDbReader {
-			path,
+			path: path.to_path_buf(),
 			reader,
 		}))
+	}
+	
+	fn enumerate_databases(config: &AppConfig) -> AHashMap<String, Vec<(DateTime<Utc>, PathBuf)>> {
+		let mut out = AHashMap::new();
+		let Ok(entries) = fs::read_dir(&config.data_dir) else { return out };
+		for entry in entries {
+			let entry = match entry {
+				Ok(entry) => entry,
+				Err(err) => {
+					error!("Unable to read {}: {err}", config.data_dir.display());
+					continue;
+				}
+			};
+			let path = entry.path();
+			let Some((
+				edition,
+				mtime
+			)) = Self::parse_edition_and_mtime_from_path(&path) else { continue };
+			let versions = out
+				.entry(edition.to_string())
+				.or_insert_with(Vec::new);
+			versions.push((mtime, path));
+		}
+		for versions in out.values_mut() {
+			versions.sort_unstable_by_key(|(mtime, _)| *mtime);
+		}
+		out
 	}
 	
 	pub fn start_updater(&self) {
@@ -199,8 +225,7 @@ impl MaxMindService {
 	) -> Result<Option<PathBuf>, MaxMindServiceError> {
 		let mtime = self.get_edition_mtime(edition);
 		let url = self.make_download_url(edition);
-		let dir = self.config.data_dir.join(edition);
-		tokio::fs::create_dir_all(&dir).await?;
+		tokio::fs::create_dir_all(&self.config.data_dir).await?;
 		let mut req = self.client.get(&url);
 		if let Some(username) = &self.config.maxmind_account_id {
 			info!("Using HTTP basic auth");
@@ -226,14 +251,14 @@ impl MaxMindService {
 			info!("Unable to retrieve {url} with HTTP status {status}");
 			return Err(MaxMindServiceError::HttpError(status));
 		}
-		let out_mtime = res.headers()
+		let last_modified = res.headers()
 			.get(header::LAST_MODIFIED)
 			.and_then(|s| s.to_str().ok())
 			.and_then(|s| DateTime::parse_from_rfc2822(s).ok())
 			.map(|t| t.to_utc())
 			.unwrap_or_else(|| Utc::now());
-		info!("Last modified: {}", out_mtime.to_rfc2822());
-		let file = NamedTempFile::new_in(&dir)?;
+		info!("Last modified: {}", last_modified.to_rfc2822());
+		let file = NamedTempFile::new_in(&self.config.data_dir)?;
 		let (file, tmp_path) = file.into_parts();
 		let mut file = tokio::fs::File::from_std(file);
 		let mut received_length: u64 = 0;
@@ -243,9 +268,8 @@ impl MaxMindService {
 		}
 		info!("Downloaded {received_length} bytes from {url}");
 		let file = NamedTempFile::from_parts(file.into_std().await, tmp_path);
-		let out_timestamp_str = out_mtime.format("%Y%m%d%H%M%S").to_string();
-		let archive_path = dir.join(format!("{edition}-{out_timestamp_str}.mmdb.tar.gz"));
-		let out_path = dir.join(format!("{edition}-{out_timestamp_str}.mmdb"));
+		let archive_path = self.make_archive_path(edition, last_modified);
+		let out_path = self.make_mmdb_path(edition, last_modified);
 		file.persist(&archive_path).map_err(|err| err.error)?;
 		info!("Downloaded {url} into {}", archive_path.display());
 		let cloned_out_path = out_path.clone();
@@ -256,8 +280,6 @@ impl MaxMindService {
 		if !res {
 			return Ok(None);
 		}
-		set_file_mtime(&out_path, FileTime::from_unix_time(out_mtime.timestamp(), 0))?;
-		set_file_mtime(&archive_path, FileTime::from_unix_time(out_mtime.timestamp(), 0))?;
 		Ok(Some(out_path))
 	}
 	
@@ -283,10 +305,17 @@ impl MaxMindService {
 	fn get_edition_mtime(&self, edition: &str) -> Option<DateTime<Utc>> {
 		let reader = self.readers.get(edition)?;
 		let reader = reader.load_full()?;
-		// TODO: Parse mtime from filename
-		let metadata = fs::metadata(&reader.path).ok()?;
-		let modified = metadata.modified().ok()?;
-		Some(modified.into())
+		let (_, mtime) = Self::parse_edition_and_mtime_from_path(&reader.path)?;
+		Some(mtime)
+	}
+	
+	fn parse_edition_and_mtime_from_path(path: &Path) -> Option<(&str, DateTime<Utc>)> {
+		let filename = path.file_name()?.to_str()?;
+		let captures = MMDB_FILENAME_PATTERN.captures(filename)?;
+		let edition = captures.get(1)?.as_str();
+		let mtime = &captures[2];
+		let mtime = NaiveDateTime::parse_from_str(mtime, "%Y%m%d%H%M%S").ok()?;
+		Some((edition, mtime.and_utc()))
 	}
 	
 	fn make_download_url(&self, edition: &str) -> String {
@@ -294,6 +323,16 @@ impl MaxMindService {
 			DOWNLOAD_URL_EDITION_PLACEHOLDER,
 			edition,
 		)
+	}
+	
+	fn make_archive_path(&self, edition: &str, last_modified: DateTime<Utc>) -> PathBuf {
+		let timestamp = last_modified.format("%Y%m%d%H%M%S").to_string();
+		self.config.data_dir.join(format!("{edition}-{timestamp}.tar.gz"))
+	}
+	
+	fn make_mmdb_path(&self, edition: &str, last_modified: DateTime<Utc>) -> PathBuf {
+		let timestamp = last_modified.format("%Y%m%d%H%M%S").to_string();
+		self.config.data_dir.join(format!("{edition}-{timestamp}.mmdb"))
 	}
 	
 	pub fn status(&self) -> GeoIpStatus {
