@@ -47,6 +47,7 @@ struct MaxMindDbReader {
 	path: PathBuf,
 	reader: maxminddb::Reader<maxminddb::Mmap>,
 	file_size: u64,
+	archive_file_size: Option<u64>,
 }
 
 pub struct MaxMindService {
@@ -118,6 +119,9 @@ impl MaxMindService {
 	fn load(path: &Path) -> Result<Arc<MaxMindDbReader>, MaxMindServiceError> {
 		info!("Opening MaxMind database {:?}", path);
 		let file_size = fs::metadata(path)?.len();
+		let archive_file_size = fs::metadata(path.with_extension("tar.gz"))
+			.ok()
+			.map(|metadata| metadata.len());
 		let reader = maxminddb::Reader::open_mmap(&path)?;
 		info!(
 			"Opened MaxMind database (type={}, build_epoch={})",
@@ -128,6 +132,7 @@ impl MaxMindService {
 			path: path.to_path_buf(),
 			reader,
 			file_size,
+			archive_file_size,
 		}))
 	}
 	
@@ -208,6 +213,9 @@ impl MaxMindService {
 		let path = self.download(edition).await?;
 		let Some(path) = path else { return Ok(()) };
 		let file_size = fs::metadata(&path)?.len();
+		let archive_file_size = fs::metadata(path.with_extension("tar.gz"))
+			.ok()
+			.map(|metadata| metadata.len());
 		let reader = match maxminddb::Reader::open_mmap(&path) {
 			Ok(reader) => reader,
 			Err(err) => {
@@ -222,6 +230,7 @@ impl MaxMindService {
 			path: path.clone(),
 			reader,
 			file_size,
+			archive_file_size,
 		})));
 		info!("Using {}", path.display());
 		Self::wait_unused_and_cleanup(old).await;
@@ -384,6 +393,7 @@ impl MaxMindService {
 			edition: edition.to_owned(),
 			timestamp: None,
 			file_size: None,
+			archive_file_size: None,
 			error: None,
 		};
 		if let Some(reader) = self.readers.get(edition).map(ArcSwapOption::load) {
@@ -392,6 +402,7 @@ impl MaxMindService {
 					reader.reader.metadata.build_epoch as i64,
 				);
 				status.file_size = Some(reader.file_size);
+				status.archive_file_size = reader.archive_file_size;
 			}
 		}
 		status.error = self.errors.get(edition).and_then(|err| {

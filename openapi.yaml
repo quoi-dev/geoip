@@ -88,6 +88,7 @@ components:
         edition: { type: string }
         timestamp: { type: string }
         file_size: { type: number }
+        archive_file_size: { type: number }
         error: { type: string }
       required: [ edition ]
     
