@@ -12,6 +12,8 @@ pub struct GeoIpDatabaseStatus {
 	pub edition: String,
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub timestamp: Option<DateTime<Utc>>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub error: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]

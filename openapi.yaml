@@ -87,6 +87,7 @@ components:
       properties:
         edition: { type: string }
         timestamp: { type: string }
+        error: { type: string }
       required: [ edition ]
     
     IpDetectResult:

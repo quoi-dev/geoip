@@ -53,6 +53,7 @@ pub struct MaxMindService {
 	config: Arc<AppConfig>,
 	client: Client,
 	readers: AHashMap<String, ArcSwapOption<MaxMindDbReader>>,
+	errors: AHashMap<String, ArcSwapOption<String>>,
 }
 
 static MMDB_FILENAME_PATTERN: LazyLock<Regex> = LazyLock::new(|| Regex::new(
@@ -61,22 +62,30 @@ static MMDB_FILENAME_PATTERN: LazyLock<Regex> = LazyLock::new(|| Regex::new(
 
 impl MaxMindService {
 	pub fn new(config: Arc<AppConfig>, client: Client) -> Arc<Self> {
-		let readers = Self::load_all_latest(&config);
+		let (
+			readers,
+			errors,
+		) = Self::load_all_latest(&config);
 		
 		Arc::new_cyclic(|me| Self {
 			me: me.clone(),
 			config,
 			client,
 			readers,
+			errors,
 		})
 	}
 	
-	fn load_all_latest(
-		config: &AppConfig,
-	) -> AHashMap<String, ArcSwapOption<MaxMindDbReader>> {
+	fn load_all_latest(config: &AppConfig) -> (
+		AHashMap<String, ArcSwapOption<MaxMindDbReader>>,
+		AHashMap<String, ArcSwapOption<String>>,
+	) {
 		let databases = Self::enumerate_databases(&config);
 		let mut out = AHashMap::new();
+		let mut errors = AHashMap::new();
 		for edition in &config.maxmind_editions {
+			errors.insert(edition.clone(), ArcSwapOption::new(None));
+			let out_err = errors.get(edition).expect("Unknown edition");
 			let mut reader = None;
 			if let Some(versions) = databases.get(edition) {
 				for (_, path) in versions.iter().rev() {
@@ -87,9 +96,11 @@ impl MaxMindService {
 					match Self::load(path) {
 						Ok(r) => {
 							reader = Some(r);
+							out_err.store(None);
 						}
 						Err(err) => {
 							warn!("Unable to open MaxMind {edition} database: {err}");
+							out_err.store(Some(Arc::new(err.to_string())));
 							Self::cleanup(path);
 						}
 					}
@@ -100,7 +111,7 @@ impl MaxMindService {
 			}
 			out.insert(edition.clone(), ArcSwapOption::from(reader));
 		}
-		out
+		(out, errors)
 	}
 	
 	fn load(path: &Path) -> Result<Arc<MaxMindDbReader>, MaxMindServiceError> {
@@ -179,7 +190,10 @@ impl MaxMindService {
 					continue;
 				}
 			}
-			let _ = self.update(edition).await;
+			let res = self.update(edition).await;
+			if let Some(out_err) = self.errors.get(edition) {
+				out_err.store(res.err().map(|err| Arc::new(err.to_string())));
+			}
 		}
 	}
 	
@@ -356,6 +370,9 @@ impl MaxMindService {
 			.map(|edition| GeoIpDatabaseStatus {
 				edition: edition.clone(),
 				timestamp: self.get_edition_timestamp(edition),
+				error: self.errors.get(edition).and_then(|err| {
+					err.load().as_ref().map(|err| (**err).clone())
+				}),
 			})
 			.collect();
 		GeoIpStatus {
