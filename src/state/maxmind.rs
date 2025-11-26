@@ -422,11 +422,15 @@ impl MaxMindService {
 		edition: Option<&str>,
 	) -> Result<Arc<MaxMindDbReader>, MaxMindServiceError> {
 		let reader = edition
-			.or(self.config.maxmind_editions.first().map(String::as_str))
+			.or_else(|| self.default_edition())
 			.and_then(|edition| self.readers.get(edition))
 			.ok_or(MaxMindServiceError::UnknownEdition)?
 			.load_full()
 			.ok_or(MaxMindServiceError::MissingDatabase)?;
 		Ok(reader)
+	}
+	
+	pub fn default_edition(&self) -> Option<&str> {
+		self.config.maxmind_editions.first().map(String::as_str)
 	}
 }

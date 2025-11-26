@@ -31,7 +31,7 @@ pub struct GeoIpLookupResult {
 	pub ip: IpAddr,
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub info: Option<GeoIpInfo>,
-	pub elapsed: f32,
+	pub elapsed: f64,
 }
 
 #[derive(Debug, Clone, Default, Serialize)]

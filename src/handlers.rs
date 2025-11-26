@@ -8,6 +8,7 @@ use axum::middleware::Next;
 use axum::response::IntoResponse;
 use axum::routing::get;
 use log::error;
+use metrics::histogram;
 use utoipa_swagger_ui::SwaggerUi;
 use crate::extractors::ClientIp;
 use crate::model::{ErrorDTO, GeoIpLookupQuery, GeoIpLookupResult, GeoIpStatus, IpDetectResult};
@@ -54,17 +55,19 @@ async fn lookup_ip(
 ) -> Result<Json<GeoIpLookupResult>, ErrorDTO> {
 	let start = Instant::now();
 	let ip = query.ip.unwrap_or(client_ip);
-	match state.maxmind.lookup(
-		ip,
-		query.locale.as_deref().unwrap_or("en"),
-		query.edition.as_deref(),
-	) {
+	let locale = query.locale.as_deref().unwrap_or("en");
+	let edition = query.edition.as_deref().or_else(|| state.maxmind.default_edition());
+	match state.maxmind.lookup(ip, locale, edition) {
 		Ok(info) => {
 			let elapsed = start.elapsed();
+			histogram!(
+				"lookup_duration_seconds",
+				"edition" => edition.unwrap_or("Unknown").to_owned(),
+			).record(elapsed.as_secs_f64());
 			Ok(Json(GeoIpLookupResult {
 				ip,
 				info,
-				elapsed: elapsed.as_secs_f32(),
+				elapsed: elapsed.as_secs_f64(),
 			}))
 		},
 		Err(MaxMindServiceError::UnknownEdition) => Err(ErrorDTO::new_static(
