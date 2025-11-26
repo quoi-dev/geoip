@@ -4,15 +4,24 @@ use axum::extract::{Query, State};
 use axum::{Json, Router};
 use axum::http::StatusCode;
 use axum::routing::get;
+use utoipa_swagger_ui::SwaggerUi;
 use crate::extractors::ClientIp;
 use crate::model::{ErrorDTO, GeoIpLookupQuery, GeoIpLookupResult, GeoIpStatus, IpDetectResult};
 use crate::state::{AppState, MaxMindServiceError};
 
 pub fn build_router(state: Arc<AppState>) -> Router {
+	let openapi_spec: serde_json::Value = serde_yaml::from_str(include_str!("../openapi.yaml"))
+		.expect("Unable to parse OpenAPI spec");
+	
 	Router::new()
 		.route("/api/status", get(get_status))
 		.route("/api/ip", get(detect_ip))
 		.route("/api/lookup", get(lookup_ip))
+		.merge(
+			SwaggerUi::new("/swagger-ui")
+				.external_url_unchecked("/api/docs", openapi_spec)
+				.config(utoipa_swagger_ui::Config::default().persist_authorization(true))
+		)
 		.with_state(state)
 }
 

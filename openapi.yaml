@@ -1,0 +1,133 @@
+openapi: 3.1.0
+info:
+  title: GeoIP service
+  description: GeoIP service
+  version: 0.1.0
+servers:
+  - url: '/'
+
+paths:
+  /api/status:
+    get:
+      operationId: getStatus
+      responses:
+        200:
+          description: Success
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/GeoIpStatus" }
+        500:
+          description: Internal server error
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorDTO" }
+  
+  /api/ip:
+    get:
+      operationId: detectIp
+      responses:
+        200:
+          description: Success
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/IpDetectResult" }
+        500:
+          description: Internal server error
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorDTO" }
+  
+  /api/lookup:
+    get:
+      operationId: lookupIp
+      parameters:
+        - in: query
+          name: ip
+          schema: { type: string }
+        - in: query
+          name: locale
+          schema: { type: string }
+        - in: query
+          name: edition
+          schema: { type: string }
+      responses:
+        200:
+          description: Success
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/GeoIpLookupResult" }
+        400:
+          description: Bad request
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorDTO" }
+        500:
+          description: Internal server error
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorDTO" }
+
+components:
+  schemas:
+    ErrorDTO:
+      type: object
+      properties:
+        status: { type: number }
+        error: { type: string }
+      required: [ status, error ]
+    
+    GeoIpStatus:
+      type: object
+      properties:
+        databases: { type: array, items: { $ref: "#/components/schemas/GeoIpDatabaseStatus" } }
+      required: [ databases ]
+    
+    GeoIpDatabaseStatus:
+      type: object
+      properties:
+        edition: { type: string }
+        timestamp: { type: string }
+      required: [ edition ]
+    
+    IpDetectResult:
+      type: object
+      properties:
+        ip: { type: string }
+      required: [ ip ]
+    
+    GeoIpLookupResult:
+      type: object
+      properties:
+        ip: { type: string }
+        info: { $ref: "#/components/schemas/GeoIpInfo" }
+        elapsed: { type: number }
+      required: [ ip, elapsed ]
+    
+    GeoIpInfo:
+      type: object
+      properties:
+        continent_id: { type: number }
+        continent_code: { type: string }
+        continent_name: { type: string }
+        country_id: { type: number }
+        country_iso_code: { type: string }
+        country_name: { type: string }
+        subdivisions: { type: array, items: { $ref: "#/components/schemas/GeoNameSubdivision" } }
+        city_id: { type: number }
+        city_name: { type: string }
+        metro_code: { type: number }
+        postal_code: { type: string }
+        timezone: { type: string }
+        latitude: { type: number }
+        accuracy_radius: { type: number }
+        is_in_european_union: { type: boolean }
+        is_anonymous_proxy: { type: boolean }
+        is_anycast: { type: boolean }
+        is_satellite_provider: { type: boolean }
+    
+    GeoNameSubdivision:
+      type: object
+      properties:
+        id: { type: number }
+        iso_code: { type: string }
+        name: { type: string }
