@@ -74,6 +74,10 @@ pub struct GeoIpInfo {
 	pub is_anycast: Option<bool>,
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub is_satellite_provider: Option<bool>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub autonomous_system_number: Option<u32>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub autonomous_system_organization: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]

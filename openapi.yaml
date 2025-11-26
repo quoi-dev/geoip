@@ -124,6 +124,8 @@ components:
         is_anonymous_proxy: { type: boolean }
         is_anycast: { type: boolean }
         is_satellite_provider: { type: boolean }
+        autonomous_system_number: { type: number }
+        autonomous_system_organization: { type: string }
     
     GeoNameSubdivision:
       type: object

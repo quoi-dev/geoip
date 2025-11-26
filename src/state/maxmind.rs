@@ -393,6 +393,10 @@ impl MaxMindService {
 			is_anonymous_proxy: res.traits.as_ref().and_then(|c| c.is_anonymous_proxy),
 			is_anycast: res.traits.as_ref().and_then(|c| c.is_anycast),
 			is_satellite_provider: res.traits.as_ref().and_then(|c| c.is_satellite_provider),
+			autonomous_system_number: res.traits.as_ref().and_then(|c| c.autonomous_system_number),
+			autonomous_system_organization: res.traits.as_ref()
+				.and_then(|c| c.autonomous_system_organization)
+				.map(str::to_owned),
 		}))
 	}
 	
