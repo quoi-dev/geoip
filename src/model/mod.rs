@@ -1,5 +1,5 @@
 mod errors;
-mod maxmind;
+mod geoip;
 
 pub use errors::*;
-pub use maxmind::*;
+pub use geoip::*;

@@ -1,3 +1,4 @@
+use std::net::SocketAddr;
 use log::info;
 use tokio::net::TcpListener;
 use crate::config::AppConfig;
@@ -8,6 +9,7 @@ mod config;
 mod handlers;
 mod state;
 mod model;
+mod extractors;
 
 #[tokio::main]
 async fn main() {
@@ -21,7 +23,7 @@ async fn main() {
 		.await
 		.expect("Unable to bind TCP listener");
 	info!("Listening on http://{}/", listener.local_addr().expect("Unable to get local address"));
-	axum::serve(listener, router)
+	axum::serve(listener, router.into_make_service_with_connect_info::<SocketAddr>())
 		.await
 		.expect("Unable to start Axum server");
 }

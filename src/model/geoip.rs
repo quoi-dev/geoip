@@ -14,9 +14,14 @@ pub struct GeoIpDatabaseStatus {
 	pub timestamp: Option<DateTime<Utc>>,
 }
 
+#[derive(Debug, Clone, Serialize)]
+pub struct IpDetectResult {
+	pub ip: IpAddr,
+}
+
 #[derive(Debug, Clone, Deserialize)]
 pub struct GeoIpLookupQuery {
-	pub ip: IpAddr,
+	pub ip: Option<IpAddr>,
 	pub locale: Option<String>,
 	pub edition: Option<String>,
 }
@@ -24,6 +29,7 @@ pub struct GeoIpLookupQuery {
 #[derive(Debug, Clone, Serialize)]
 pub struct GeoIpLookupResult {
 	pub ip: IpAddr,
+	#[serde(skip_serializing_if = "Option::is_none")]
 	pub info: Option<GeoIpInfo>,
 	pub elapsed: f32,
 }
