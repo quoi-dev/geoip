@@ -15,6 +15,7 @@ pub struct AppConfig {
 	pub maxmind_editions: Vec<String>,
 	pub maxmind_download_url: String,
 	pub auto_update: bool,
+	pub auto_update_interval: u64,
 }
 
 impl AppConfig {
@@ -35,9 +36,13 @@ impl AppConfig {
 			.map(str::to_owned)
 			.collect();
 		let maxmind_download_url = env::var("MAXMIND_DOWNLOAD_URL").ok();
-		let autoupdate = maxmind_account_id.is_some() || maxmind_download_url.is_some();
+		let auto_update = maxmind_account_id.is_some() || maxmind_download_url.is_some();
 		let maxmind_download_url = maxmind_download_url
 			.unwrap_or_else(|| DOWNLOAD_URL.to_owned());
+		let auto_update_interval = env::var("AUTO_UPDATE_INTERVAL").ok()
+			.unwrap_or_else(|| "24".to_owned())
+			.parse()
+			.expect("AUTO_UPDATE_INTERVAL must be a valid integer");
 		
 		Arc::new(Self {
 			listen_addr,
@@ -46,7 +51,8 @@ impl AppConfig {
 			maxmind_license_key,
 			maxmind_editions,
 			maxmind_download_url,
-			auto_update: autoupdate,
+			auto_update,
+			auto_update_interval,
 		})
 	}
 }

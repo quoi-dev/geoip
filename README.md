@@ -32,6 +32,8 @@ GeoIP service on http://localhost:8080/.
 - `MAXMIND_DOWNLOAD_URL` (optional) - MaxMind database
   download url. You can use `{edition}` placeholder.
   Defaults to `https://download.maxmind.com/geoip/databases/{edition}/download?suffix=tar.gz`
+- `AUTO_UPDATE_INTERVAL` (optional) - Auto-update interval 
+  in hours. Defaults to 24 hours.
 
 If `MAXMIND_ACCOUNT_ID` or `MAXMIND_DOWNLOAD_URL` are set, 
 automatic updates are enabled, otherwise you need to download,

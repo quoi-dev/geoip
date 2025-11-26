@@ -149,10 +149,14 @@ impl MaxMindService {
 		if !self.config.auto_update {
 			info!("Auto-update is disabled");
 			return;
+		} else {
+			info!("Auto-update interval: {} hour(s)", self.config.auto_update_interval);
 		}
 		tokio::task::spawn(async move {
 			info!("Started background auto-updater");
-			let mut interval = tokio::time::interval(Duration::from_hours(24));
+			let mut interval = tokio::time::interval(
+				Duration::from_hours(me.config.auto_update_interval),
+			);
 			interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
 			loop {
 				interval.tick().await;
