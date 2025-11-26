@@ -46,6 +46,7 @@ pub enum MaxMindServiceError {
 struct MaxMindDbReader {
 	path: PathBuf,
 	reader: maxminddb::Reader<maxminddb::Mmap>,
+	file_size: u64,
 }
 
 pub struct MaxMindService {
@@ -116,6 +117,7 @@ impl MaxMindService {
 	
 	fn load(path: &Path) -> Result<Arc<MaxMindDbReader>, MaxMindServiceError> {
 		info!("Opening MaxMind database {:?}", path);
+		let file_size = fs::metadata(path)?.len();
 		let reader = maxminddb::Reader::open_mmap(&path)?;
 		info!(
 			"Opened MaxMind database (type={}, build_epoch={})",
@@ -125,6 +127,7 @@ impl MaxMindService {
 		Ok(Arc::new(MaxMindDbReader {
 			path: path.to_path_buf(),
 			reader,
+			file_size,
 		}))
 	}
 	
@@ -204,6 +207,7 @@ impl MaxMindService {
 			.ok_or(MaxMindServiceError::UnknownEdition)?;
 		let path = self.download(edition).await?;
 		let Some(path) = path else { return Ok(()) };
+		let file_size = fs::metadata(&path)?.len();
 		let reader = match maxminddb::Reader::open_mmap(&path) {
 			Ok(reader) => reader,
 			Err(err) => {
@@ -217,6 +221,7 @@ impl MaxMindService {
 		let old = out_reader.swap(Some(Arc::new(MaxMindDbReader {
 			path: path.clone(),
 			reader,
+			file_size,
 		})));
 		info!("Using {}", path.display());
 		Self::wait_unused_and_cleanup(old).await;
@@ -367,17 +372,32 @@ impl MaxMindService {
 	pub fn status(&self) -> GeoIpStatus {
 		let databases = self.config.maxmind_editions
 			.iter()
-			.map(|edition| GeoIpDatabaseStatus {
-				edition: edition.clone(),
-				timestamp: self.get_edition_timestamp(edition),
-				error: self.errors.get(edition).and_then(|err| {
-					err.load().as_ref().map(|err| (**err).clone())
-				}),
-			})
+			.map(|edition| self.get_edition_status(edition))
 			.collect();
 		GeoIpStatus {
 			databases,
 		}
+	}
+	
+	fn get_edition_status(&self, edition: &str) -> GeoIpDatabaseStatus {
+		let mut status = GeoIpDatabaseStatus {
+			edition: edition.to_owned(),
+			timestamp: None,
+			file_size: None,
+			error: None,
+		};
+		if let Some(reader) = self.readers.get(edition).map(ArcSwapOption::load) {
+			if let Some(reader) = reader.as_ref() {
+				status.timestamp = DateTime::from_timestamp_secs(
+					reader.reader.metadata.build_epoch as i64,
+				);
+				status.file_size = Some(reader.file_size);
+			}
+		}
+		status.error = self.errors.get(edition).and_then(|err| {
+			err.load().as_ref().map(|err| (**err).clone())
+		});
+		status
 	}
 	
 	pub fn lookup(
@@ -439,14 +459,6 @@ impl MaxMindService {
 				.and_then(|c| c.autonomous_system_organization)
 				.map(str::to_owned),
 		}))
-	}
-	
-	fn get_edition_timestamp(&self, edition: &str) -> Option<DateTime<Utc>> {
-		let reader = self.readers.get(edition)?;
-		reader.load()
-			.as_ref()
-			.and_then(|r| r.reader.metadata.build_epoch.try_into().ok())
-			.and_then(DateTime::from_timestamp_secs)
 	}
 	
 	fn get_reader(
