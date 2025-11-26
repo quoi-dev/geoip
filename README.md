@@ -1,9 +1,30 @@
 # GeoIP service
 
+## Quick setup
+
+```shell
+docker run \
+  -e MAXMIND_ACCOUNT_ID=XXXX \
+  -e MAXMIND_LICENCE_KEY=YYYY \
+  -v geoip_data:/data \
+  -p 8080:8080 \
+  ghcr.io/quoi-dev/geoip:latest
+```
+
+You can get MaxMind account id and licence key for free here:
+https://dev.maxmind.com/geoip/geolite2-free-geolocation-data/
+
+After executing this command, you'll be able to access 
+GeoIP service on http://localhost:8080/.
+
 ## Configuration
 
+- `LISTEN_ADDR` (optional) - socket address to bind HTTP server.
+  Defaults to `127.0.0.1:8080` for local setup and to
+  `0.0.0.0:8080` for Docker image
 - `DATA_DIR` (required) - directory with `.mmdb` files,
-  must be writable if auto-updates are enabled
+  must be writable if auto-updates are enabled. Defaults to
+  `/data` for Docker image
 - `MAXMIND_ACCOUNT_ID` (optional) - MaxMind account id
 - `MAXMIND_LICENCE_KEY` (optional) - MaxMind license key
 - `MAXMIND_EDITIONS` (optional) - Comma-separated MaxMind 
@@ -13,7 +34,11 @@
   Defaults to `https://download.maxmind.com/geoip/databases/{edition}/download?suffix=tar.gz`
 
 If `MAXMIND_ACCOUNT_ID` or `MAXMIND_DOWNLOAD_URL` are set, 
-automatic updates are enabled.
+automatic updates are enabled, otherwise you need to download,
+extract and place `mmdb` files to `DATA_DIR` by hand.
+
+File names must have format `{edition}-{datetime}.mmdb`.
+Example: `GeoLite2-City-20251125154543.mmdb`.
 
 ## Tech stack
 

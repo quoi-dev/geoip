@@ -14,7 +14,7 @@ arc-swap = "1.7"
 serde = "1"
 maxminddb = { version = "0.26", features = ["mmap"] }
 chrono = { version = "0.4", features = ["serde"] }
-reqwest = { version = "0.12", features = ["rustls-tls", "rustls-tls-native-roots"] }
+reqwest = { version = "0.12", features = ["rustls-tls", "rustls-tls-native-roots"], default-features = false }
 ahash = "0.8"
 tempfile = "3.23"
 flate2 = "1"
