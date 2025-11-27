@@ -123,7 +123,7 @@ export const GeoIpForm: React.FC<GeoIpFormProps> = ({databases}) => {
 			{result && (
 				<>
 					<div className="alert alert-success alert-soft mb-4">
-						{result.elapsed * 1000}ms elapsed
+						{(result.elapsed * 1000).toFixed(3)}ms elapsed
 					</div>
 					<div className="card bg-base-200 w-full shadow-sm mb-4">
 						<div className="card-body">
