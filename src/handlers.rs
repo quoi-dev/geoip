@@ -26,7 +26,7 @@ pub fn build_router(state: Arc<AppState>) -> Router {
 	Router::new()
 		.route("/api/status", get(get_status))
 		.route("/api/ip", get(detect_ip))
-		.route("/api/lookup", get(lookup_ip))
+		.route("/api/geoip", get(lookup_geoip))
 		.route("/api/metrics", get(|| async move { metric_handle.render() }))
 		.merge(
 			SwaggerUi::new("/swagger-ui")
@@ -48,7 +48,7 @@ async fn detect_ip(ClientIp(client_ip): ClientIp) -> Json<IpDetectResult> {
 	})
 }
 
-async fn lookup_ip(
+async fn lookup_geoip(
 	State(state): State<Arc<AppState>>,
 	ClientIp(client_ip): ClientIp,
 	Query(query): Query<GeoIpLookupQuery>,

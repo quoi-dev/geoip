@@ -37,9 +37,9 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorDTO" }
   
-  /api/lookup:
+  /api/geoip:
     get:
-      operationId: lookupIp
+      operationId: lookupGeoIp
       parameters:
         - in: query
           name: ip
