@@ -2,6 +2,10 @@
 /data
 /.env
 
+/node_modules
+/dist
+/web-src/client
+
 .idea
 .vscode
 .history

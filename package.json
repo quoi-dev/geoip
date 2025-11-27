@@ -1,0 +1,29 @@
+{
+	"name": "geoip",
+	"version": "1.0.0",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"build": "rsbuild build",
+		"dev": "rsbuild dev --open",
+		"preview": "rsbuild preview",
+		"type-check": "tsc --noEmit",
+		"openapi-ts": "openapi-ts"
+	},
+	"dependencies": {
+		"react": "^19.2.0",
+		"react-dom": "^19.2.0",
+		"react-hook-form": "^7.66.1"
+	},
+	"devDependencies": {
+		"@hey-api/openapi-ts": "^0.88.0",
+		"@rsbuild/core": "^1.6.7",
+		"@rsbuild/plugin-react": "^1.4.2",
+		"@tailwindcss/postcss": "^4.1.17",
+		"@types/react": "^19.2.6",
+		"@types/react-dom": "^19.2.3",
+		"daisyui": "^5.5.5",
+		"tailwindcss": "^4.1.17",
+		"typescript": "^5.9.3"
+	}
+}

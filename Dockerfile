@@ -1,3 +1,26 @@
+FROM node:25-alpine AS node_builder
+
+WORKDIR /usr/src/app
+
+RUN npm i -g pnpm
+
+COPY package.json ./
+COPY pnpm-lock.yaml ./
+
+RUN pnpm install
+
+COPY rsbuild.config.ts ./
+COPY tsconfig.json ./
+COPY postcss.config.mjs ./
+COPY openapi-ts.config.ts ./
+COPY openapi.yaml ./
+COPY public ./public
+COPY web-src ./web-src
+
+RUN pnpm openapi-ts
+RUN pnpm type-check
+RUN pnpm build
+
 FROM rust:alpine AS cargo_chef
 
 RUN apk update
@@ -52,6 +75,7 @@ RUN adduser \
     "${USER}"
 
 COPY --from=rust_builder /usr/src/app/target/release/geoip ./
+COPY --from=node_builder /usr/src/app/dist ./dist
 
 RUN mkdir -p /data && chown -R ${UID}:${UID} /data
 VOLUME ["/data"]

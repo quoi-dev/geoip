@@ -9,6 +9,7 @@ use axum::response::IntoResponse;
 use axum::routing::get;
 use log::error;
 use metrics::histogram;
+use tower_http::services::{ServeDir, ServeFile};
 use utoipa_swagger_ui::SwaggerUi;
 use crate::extractors::ClientIp;
 use crate::model::{ErrorDTO, GeoIpLookupQuery, GeoIpLookupResult, GeoIpStatus, IpDetectResult};
@@ -33,6 +34,9 @@ pub fn build_router(state: Arc<AppState>) -> Router {
 				.external_url_unchecked("/api/docs", openapi_spec)
 				.config(utoipa_swagger_ui::Config::default().persist_authorization(true))
 		)
+		.route_service("/", ServeFile::new("dist/index.html"))
+		.route_service("/favicon.ico", ServeFile::new("dist/favicon.ico"))
+		.nest_service("/static", ServeDir::new("dist/static"))
 		.layer(middleware::from_fn(log_internal_server_errors))
 		.layer(prometheus_layer)
 		.with_state(state)
