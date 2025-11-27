@@ -12,6 +12,8 @@ pub struct GeoIpDatabaseStatus {
 	pub edition: String,
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub timestamp: Option<DateTime<Utc>>,
+	#[serde(skip_serializing_if = "Vec::is_empty")]
+	pub locales: Vec<String>,
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub file_size: Option<u64>,
 	#[serde(skip_serializing_if = "Option::is_none")]

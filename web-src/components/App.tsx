@@ -28,7 +28,7 @@ const App: React.FC = () => {
 			{error && (<div className="alert alert-error alert-soft mb-4">
 				{error}
 			</div>)}
-			<GeoIpForm editions={status?.databases.map(db => db.edition) ?? []} />
+			<GeoIpForm databases={status?.databases ?? []} />
 			<footer className="footer sm:footer-horizontal footer-center">
 				<aside>
 					<div>

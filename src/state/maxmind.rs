@@ -392,6 +392,7 @@ impl MaxMindService {
 		let mut status = GeoIpDatabaseStatus {
 			edition: edition.to_owned(),
 			timestamp: None,
+			locales: Vec::new(),
 			file_size: None,
 			archive_file_size: None,
 			error: None,
@@ -401,6 +402,7 @@ impl MaxMindService {
 				status.timestamp = DateTime::from_timestamp_secs(
 					reader.reader.metadata.build_epoch as i64,
 				);
+				status.locales = reader.reader.metadata.languages.clone();
 				status.file_size = Some(reader.file_size);
 				status.archive_file_size = reader.archive_file_size;
 			}

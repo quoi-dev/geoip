@@ -1,22 +1,25 @@
-import React, { type FormEvent, useCallback, useEffect, useState } from "react";
+import React, { type FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import * as api from "../client";
 import { GeoIpInfo } from "./GeoIpInfo.tsx";
 
 interface GeoIpFormData {
 	ip: string;
+	locale: string;
 	edition: string;
 }
 
 export interface GeoIpFormProps {
-	editions: string[];
+	databases: api.GeoIpDatabaseStatus[];
 }
 
-export const GeoIpForm: React.FC<GeoIpFormProps> = ({editions}) => {
-	const {register, handleSubmit, setValue} = useForm<GeoIpFormData>();
+export const GeoIpForm: React.FC<GeoIpFormProps> = ({databases}) => {
+	const {register, handleSubmit, setValue, watch} = useForm<GeoIpFormData>();
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const [result, setResult] = useState<api.GeoIpLookupResult | null>(null);
+	const edition = watch("edition");
+	const locale = watch("locale");
 	
 	useEffect(() => {
 		(async () => {
@@ -38,9 +41,21 @@ export const GeoIpForm: React.FC<GeoIpFormProps> = ({editions}) => {
 	}, []);
 	
 	useEffect(() => {
-		if (!editions.length) return;
-		setValue("edition", editions[0]);
-	}, [editions]);
+		if (!databases.length) return;
+		setValue("edition", databases[0].edition);
+	}, [databases]);
+	
+	const locales = useMemo(
+		() => databases.find(
+			database => database.edition === edition,
+		)?.locales ?? [],
+		[databases, edition],
+	);
+	
+	useEffect(() => {
+		if (!locales.length || locale !== "") return;
+		setValue("locale", locales.indexOf("en") !== undefined ? "en" : locales[0]);
+	}, [locales, locale]);
 	
 	const handleFormSubmit = useCallback((evt: FormEvent) => {
 		handleSubmit(async data => {
@@ -52,6 +67,7 @@ export const GeoIpForm: React.FC<GeoIpFormProps> = ({editions}) => {
 					query: {
 						ip: data.ip,
 						edition: data.edition,
+						locale: data.locale,
 					},
 				});
 				if (res.error) {
@@ -78,14 +94,25 @@ export const GeoIpForm: React.FC<GeoIpFormProps> = ({editions}) => {
 						{...register("ip", {required: true})}
 						required
 					/>
-					<select className="select w-full md:w-auto join-item" {...register("edition")}>
-						{editions.map(edition => (
-							<option key={edition} value={edition}>
-								{edition}
+					<select className="select w-full md:w-auto join-item" {...register("locale")}>
+						{locales.map(locale => (
+							<option key={locale} value={locale}>
+								{locale}
 							</option>
 						))}
 					</select>
-					<button type="submit" className="btn join-item" disabled={loading || !editions.length}>
+					<select className="select w-full md:w-auto join-item" {...register("edition")}>
+						{databases.map(database => (
+							<option key={database.edition} value={database.edition}>
+								{database.edition}
+							</option>
+						))}
+					</select>
+					<button
+						type="submit"
+						className="btn join-item"
+						disabled={loading || !databases.length || !locales.length}
+					>
 						Lookup
 					</button>
 				</div>

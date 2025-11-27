@@ -87,6 +87,7 @@ components:
       properties:
         edition: { type: string }
         timestamp: { type: string }
+        locales: { type: array, items: { type: string } }
         file_size: { type: number }
         archive_file_size: { type: number }
         error: { type: string }
