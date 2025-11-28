@@ -3,10 +3,11 @@ import { useForm } from "react-hook-form";
 import * as api from "../client";
 import { GeoIpInfo } from "./GeoIpInfo.tsx";
 
+const EDITION_STORAGE_KEY = "geoip.edition";
+const LOCALE_STORAGE_KEY = "geoip.locale";
+
 interface GeoIpFormData {
 	ip: string;
-	locale: string;
-	edition: string;
 }
 
 export interface GeoIpFormProps {
@@ -14,12 +15,12 @@ export interface GeoIpFormProps {
 }
 
 export const GeoIpForm: React.FC<GeoIpFormProps> = ({databases}) => {
-	const {register, handleSubmit, setValue, watch} = useForm<GeoIpFormData>();
+	const {register, handleSubmit, setValue} = useForm<GeoIpFormData>();
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const [result, setResult] = useState<api.GeoIpLookupResult | null>(null);
-	const edition = watch("edition");
-	const locale = watch("locale");
+	const [edition, setEdition] = useState("");
+	const [locale, setLocale] = useState("");
 	
 	useEffect(() => {
 		(async () => {
@@ -42,7 +43,21 @@ export const GeoIpForm: React.FC<GeoIpFormProps> = ({databases}) => {
 	
 	useEffect(() => {
 		if (!databases.length) return;
-		setValue("edition", databases[0].edition);
+		const storedEdition = localStorage.getItem(EDITION_STORAGE_KEY);
+		const storedLocale = localStorage.getItem(LOCALE_STORAGE_KEY);
+		if (storedEdition !== null) {
+			const database = databases.find(
+				database => database.edition === storedEdition,
+			);
+			if (database) {
+				setEdition(database.edition);
+				if (storedLocale !== null && (database.locales?.indexOf(storedLocale) ?? -1) >= 0) {
+					setLocale(storedLocale);
+				}
+				return;
+			}
+		}
+		setEdition(databases[0].edition);
 	}, [databases]);
 	
 	const locales = useMemo(
@@ -53,9 +68,19 @@ export const GeoIpForm: React.FC<GeoIpFormProps> = ({databases}) => {
 	);
 	
 	useEffect(() => {
-		if (!locales.length || locale !== "") return;
-		setValue("locale", locales.indexOf("en") !== undefined ? "en" : locales[0]);
+		if (!locales.length || !!locale) return;
+		setLocale(locales.indexOf("en") >= 0 ? "en" : locales[0]);
 	}, [locales, locale]);
+	
+	useEffect(() => {
+		if (!databases.length || !edition) return;
+		localStorage.setItem(EDITION_STORAGE_KEY, edition);
+	}, [databases, edition]);
+	
+	useEffect(() => {
+		if (!databases.length || !locales.length || !locale) return;
+		localStorage.setItem(LOCALE_STORAGE_KEY, locale);
+	}, [databases, locales, locale]);
 	
 	const handleFormSubmit = useCallback((evt: FormEvent) => {
 		handleSubmit(async data => {
@@ -66,8 +91,8 @@ export const GeoIpForm: React.FC<GeoIpFormProps> = ({databases}) => {
 				const res = await api.lookupGeoIp({
 					query: {
 						ip: data.ip,
-						edition: data.edition,
-						locale: data.locale,
+						edition,
+						locale,
 					},
 				});
 				if (res.error) {
@@ -81,6 +106,14 @@ export const GeoIpForm: React.FC<GeoIpFormProps> = ({databases}) => {
 				setLoading(false);
 			}
 		})(evt);
+	}, [edition, locale]);
+
+	const handleEditionChange = useCallback((evt: React.ChangeEvent<HTMLSelectElement>) => {
+		setEdition(evt.target.value);
+	}, []);
+	
+	const handleLocaleChange = useCallback((evt: React.ChangeEvent<HTMLSelectElement>) => {
+		setLocale(evt.target.value);
 	}, []);
 	
 	return (
@@ -94,14 +127,22 @@ export const GeoIpForm: React.FC<GeoIpFormProps> = ({databases}) => {
 						{...register("ip", {required: true})}
 						required
 					/>
-					<select className="select w-full md:w-auto join-item" {...register("locale")}>
+					<select
+						className="select w-full md:w-auto join-item"
+						value={locale}
+						onChange={handleLocaleChange}
+					>
 						{locales.map(locale => (
 							<option key={locale} value={locale}>
 								{locale}
 							</option>
 						))}
 					</select>
-					<select className="select w-full md:w-auto join-item" {...register("edition")}>
+					<select
+						className="select w-full md:w-auto join-item"
+						value={edition}
+						onChange={handleEditionChange}
+					>
 						{databases.map(database => (
 							<option key={database.edition} value={database.edition}>
 								{database.edition}
