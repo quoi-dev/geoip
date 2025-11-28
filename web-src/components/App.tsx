@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import * as api from "../client";
 import { GeoIpForm } from "./GeoIpForm.tsx";
+import { GeoIpStatus } from "./GeoIpStatus.tsx";
 
 const App: React.FC = () => {
 	const [error, setError] = useState<string | null>(null);
@@ -29,6 +30,7 @@ const App: React.FC = () => {
 				{error}
 			</div>)}
 			<GeoIpForm databases={status?.databases ?? []} />
+			{status && <GeoIpStatus status={status} />}
 			<footer className="footer sm:footer-horizontal footer-center">
 				<aside>
 					<div>
