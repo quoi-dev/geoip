@@ -36,7 +36,7 @@ pub fn build_router(state: Arc<AppState>) -> Router {
 		)
 		.route_service("/", ServeFile::new("dist/index.html"))
 		.route_service("/favicon.ico", ServeFile::new("dist/favicon.ico"))
-		.nest_service("/static", ServeDir::new("dist/static"))
+		.nest_service("/static", ServeDir::new("dist/static").precompressed_gzip())
 		.layer(middleware::from_fn(log_internal_server_errors))
 		.layer(prometheus_layer)
 		.with_state(state)
