@@ -56,6 +56,7 @@ pub struct MaxMindService {
 	client: Client,
 	readers: AHashMap<String, ArcSwapOption<MaxMindDbReader>>,
 	errors: AHashMap<String, ArcSwapOption<String>>,
+	last_update_checks: AHashMap<String, ArcSwapOption<DateTime<Utc>>>,
 }
 
 static MMDB_FILENAME_PATTERN: LazyLock<Regex> = LazyLock::new(|| Regex::new(
@@ -67,6 +68,7 @@ impl MaxMindService {
 		let (
 			readers,
 			errors,
+			last_update_checks,
 		) = Self::load_all_latest(&config);
 		
 		Arc::new_cyclic(|me| Self {
@@ -75,16 +77,19 @@ impl MaxMindService {
 			client,
 			readers,
 			errors,
+			last_update_checks,
 		})
 	}
 	
 	fn load_all_latest(config: &AppConfig) -> (
 		AHashMap<String, ArcSwapOption<MaxMindDbReader>>,
 		AHashMap<String, ArcSwapOption<String>>,
+		AHashMap<String, ArcSwapOption<DateTime<Utc>>>,
 	) {
 		let databases = Self::enumerate_databases(&config);
 		let mut out = AHashMap::new();
 		let mut errors = AHashMap::new();
+		let mut last_update_checks = AHashMap::new();
 		for edition in &config.maxmind_editions {
 			errors.insert(edition.clone(), ArcSwapOption::new(None));
 			let out_err = errors.get(edition).expect("Unknown edition");
@@ -112,8 +117,9 @@ impl MaxMindService {
 				warn!("No available versions for {edition} MaxMind database");
 			}
 			out.insert(edition.clone(), ArcSwapOption::from(reader));
+			last_update_checks.insert(edition.clone(), ArcSwapOption::new(None));
 		}
-		(out, errors)
+		(out, errors, last_update_checks)
 	}
 	
 	fn load(path: &Path) -> Result<Arc<MaxMindDbReader>, MaxMindServiceError> {
@@ -202,6 +208,9 @@ impl MaxMindService {
 			}
 			if let Some(utime) = self.get_update_check_timestamp(edition).await {
 				if now.signed_duration_since(utime) < min_time_delta {
+					self.last_update_checks.get(edition).inspect(|ts|
+						ts.store(Some(Arc::new(utime)))
+					);
 					info!(
 						"Skipping update for {edition}, because it was already performed \
 						in less than {} hour(s)",
@@ -293,6 +302,9 @@ impl MaxMindService {
 		}
 		info!("Downloading {url}...");
 		let timestamp = Utc::now();
+		self.last_update_checks.get(edition).inspect(|ts|
+			ts.store(Some(Arc::new(timestamp)))
+		);
 		let mut res = req.send().await?;
 		let status = res.status();
 		if status == StatusCode::NOT_MODIFIED {
@@ -432,6 +444,7 @@ impl MaxMindService {
 			file_size: None,
 			archive_file_size: None,
 			error: None,
+			last_update_check: None,
 		};
 		if let Some(reader) = self.readers.get(edition).map(ArcSwapOption::load) {
 			if let Some(reader) = reader.as_ref() {
@@ -443,6 +456,9 @@ impl MaxMindService {
 				status.archive_file_size = reader.archive_file_size;
 			}
 		}
+		status.last_update_check = self.last_update_checks.get(edition).and_then(|ts| {
+			ts.load().as_ref().map(|t| **t)
+		});
 		status.error = self.errors.get(edition).and_then(|err| {
 			err.load().as_ref().map(|err| (**err).clone())
 		});

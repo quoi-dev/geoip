@@ -19,6 +19,8 @@ pub struct GeoIpDatabaseStatus {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub archive_file_size: Option<u64>,
 	#[serde(skip_serializing_if = "Option::is_none")]
+	pub last_update_check: Option<DateTime<Utc>>,
+	#[serde(skip_serializing_if = "Option::is_none")]
 	pub error: Option<String>,
 }
 

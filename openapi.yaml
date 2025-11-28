@@ -90,6 +90,7 @@ components:
         locales: { type: array, items: { type: string } }
         file_size: { type: number }
         archive_file_size: { type: number }
+        last_update_check: { type: string }
         error: { type: string }
       required: [ edition ]
     
