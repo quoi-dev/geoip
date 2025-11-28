@@ -187,12 +187,24 @@ impl MaxMindService {
 	async fn update_all(&self) {
 		info!("Updating all databases");
 		let now = Utc::now();
-		let min_time_delta = TimeDelta::hours(self.config.auto_update_interval as i64);
+		let min_time_delta = (
+			TimeDelta::hours(self.config.auto_update_interval as i64) - TimeDelta::minutes(5)
+		).max(TimeDelta::default());
 		for edition in &self.config.maxmind_editions {
 			if let Some(mtime) = self.get_edition_mtime(edition) {
 				if now.signed_duration_since(mtime) < min_time_delta {
 					info!(
 						"Skipping update for {edition}, because it is newer than {} hour(s)",
+						self.config.auto_update_interval,
+					);
+					continue;
+				}
+			}
+			if let Some(utime) = self.get_update_check_timestamp(edition).await {
+				if now.signed_duration_since(utime) < min_time_delta {
+					info!(
+						"Skipping update for {edition}, because it was already performed \
+						in less than {} hour(s)",
 						self.config.auto_update_interval,
 					);
 					continue;
@@ -280,6 +292,7 @@ impl MaxMindService {
 			req = req.header(header::IF_MODIFIED_SINCE, mtime_str);
 		}
 		info!("Downloading {url}...");
+		let timestamp = Utc::now();
 		let mut res = req.send().await?;
 		let status = res.status();
 		if status == StatusCode::NOT_MODIFIED {
@@ -288,6 +301,7 @@ impl MaxMindService {
 			} else {
 				info!("{url} wasn't modified");
 			}
+			self.store_update_check_timestamp(edition, timestamp).await?;
 			return Ok(None);
 		}
 		if !status.is_success() {
@@ -324,6 +338,28 @@ impl MaxMindService {
 			return Ok(None);
 		}
 		Ok(Some(out_path))
+	}
+	
+	async fn store_update_check_timestamp(
+		&self,
+		edition: &str,
+		timestamp: DateTime<Utc>,
+	) -> Result<(), MaxMindServiceError> {
+		let file = NamedTempFile::new_in(&self.config.data_dir)?;
+		let (file, tmp_path) = file.into_parts();
+		let mut file = tokio::fs::File::from_std(file);
+		file.write_all(format!("{}\n", timestamp.to_rfc2822()).as_bytes()).await?;
+		let file = NamedTempFile::from_parts(file.into_std().await, tmp_path);
+		let path = self.config.data_dir.join(format!("{}.timestamp", edition));
+		file.persist(&path).map_err(|err| err.error)?;
+		Ok(())
+	}
+	
+	async fn get_update_check_timestamp(&self, edition: &str) -> Option<DateTime<Utc>> {
+		let path = self.config.data_dir.join(format!("{}.timestamp", edition));
+		let contents = tokio::fs::read_to_string(&path).await.ok()?;
+		let timestamp = DateTime::parse_from_rfc2822(contents.trim()).ok()?;
+		Some(timestamp.with_timezone(&Utc))
 	}
 	
 	fn extract_mmdb(
