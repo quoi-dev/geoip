@@ -275,7 +275,7 @@ impl MaxMindService {
 		} else {
 			info!("Deleted outdated MaxMind database {}", path.display());
 		}
-		let archive_path = path.with_added_extension("tar.gz");
+		let archive_path = path.with_extension("tar.gz");
 		if let Err(err) = fs::remove_file(&archive_path) {
 			error!("Unable to remove outdated MaxMind database archive {}: {err}", archive_path.display());
 		} else {
