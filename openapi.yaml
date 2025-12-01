@@ -40,6 +40,7 @@ paths:
   /api/geoip:
     get:
       operationId: lookupGeoIp
+      security: [{ bearer: [] }]
       parameters:
         - in: query
           name: ip
@@ -68,6 +69,11 @@ paths:
               schema: { $ref: "#/components/schemas/ErrorDTO" }
 
 components:
+  securitySchemes:
+    bearer:
+      type: http
+      scheme: bearer
+  
   schemas:
     ErrorDTO:
       type: object

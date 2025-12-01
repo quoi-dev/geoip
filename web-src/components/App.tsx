@@ -1,11 +1,26 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import * as api from "../client";
 import { GeoIpForm } from "./GeoIpForm.tsx";
 import { GeoIpStatus } from "./GeoIpStatus.tsx";
+import { useShowDialog } from "./DialogProvider.tsx";
+import { ApiKeyDialog } from "./ApiKeyDialog.tsx";
+import { client } from "../client/client.gen.ts";
+import { ConfirmDialog } from "./ConfirmDialog.tsx";
 
-const App: React.FC = () => {
+const API_KEY_STORAGE_KEY = "geoip.api-key";
+
+export const App: React.FC = () => {
+	const showDialog = useShowDialog();
 	const [error, setError] = useState<string | null>(null);
 	const [status, setStatus] = useState<api.GeoIpStatus | null>(null);
+	const [authenticated, setAuthenticated] = useState(false);
+	
+	useEffect(() => {
+		const apiKey = localStorage.getItem(API_KEY_STORAGE_KEY);
+		if (apiKey === null) return;
+		client.setConfig({auth: apiKey});
+		setAuthenticated(true);
+	}, []);
 	
 	useEffect(() => {
 		(async () => {
@@ -21,6 +36,28 @@ const App: React.FC = () => {
 				setError(err.message ?? err.toString());
 			}
 		})();
+	}, []);
+	
+	const handleApiKeyClick = useCallback(async (evt: React.MouseEvent) => {
+		evt.preventDefault();
+		const apiKey = await showDialog(ApiKeyDialog);
+		if (apiKey === undefined) return;
+		localStorage.setItem(API_KEY_STORAGE_KEY, apiKey);
+		client.setConfig({auth: apiKey});
+		setAuthenticated(true);
+	}, []);
+	
+	const handleForgetApiKeyClick = useCallback(async (evt: React.MouseEvent) => {
+		evt.preventDefault();
+		const res = await showDialog(ConfirmDialog, {
+			title: "Forget API key",
+			messageHtml: "You're going to logout",
+			primaryButton: "Logout"
+		});
+		if (!res) return;
+		localStorage.removeItem(API_KEY_STORAGE_KEY);
+		client.setConfig({auth: undefined});
+		setAuthenticated(false);
 	}, []);
 	
 	return (
@@ -42,15 +79,21 @@ const App: React.FC = () => {
 							Project source code on GitHub
 						</a>
 					</div>
-					<div>
+					<div className="flex gap-2">
 						<a className="link" href="/swagger-ui" target="_blank">
 							Swagger UI
 						</a>
+						<a className="link" href="#" onClick={handleApiKeyClick}>
+							API key
+						</a>
+						{authenticated && (
+							<a className="link" href="#" onClick={handleForgetApiKeyClick}>
+								Forget API key
+							</a>
+						)}
 					</div>
 				</aside>
 			</footer>
 		</div>
 	);
 };
-
-export default App;

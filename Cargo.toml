@@ -10,6 +10,7 @@ env_logger = "0.11"
 thiserror = "2"
 tokio = { version = "1", features = ["macros", "fs", "rt-multi-thread"] }
 axum = { version = "0.8", features = ["macros"] }
+axum-extra = { version = "0.12", features = ["typed-header"] }
 arc-swap = "1.7"
 serde = "1"
 maxminddb = { version = "0.26", features = ["mmap"] }

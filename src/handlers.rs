@@ -11,7 +11,7 @@ use log::error;
 use metrics::histogram;
 use tower_http::services::{ServeDir, ServeFile};
 use utoipa_swagger_ui::SwaggerUi;
-use crate::extractors::ClientIp;
+use crate::extractors::{Auth, ClientIp};
 use crate::model::{ErrorDTO, GeoIpLookupQuery, GeoIpLookupResult, GeoIpStatus, IpDetectResult};
 use crate::state::{AppState, MaxMindServiceError};
 
@@ -55,6 +55,7 @@ async fn detect_ip(ClientIp(client_ip): ClientIp) -> Json<IpDetectResult> {
 async fn lookup_geoip(
 	State(state): State<Arc<AppState>>,
 	ClientIp(client_ip): ClientIp,
+	_auth: Auth,
 	Query(query): Query<GeoIpLookupQuery>,
 ) -> Result<Json<GeoIpLookupResult>, ErrorDTO> {
 	let start = Instant::now();

@@ -151,7 +151,7 @@ export const GeoIpForm: React.FC<GeoIpFormProps> = ({databases}) => {
 					</select>
 					<button
 						type="submit"
-						className="btn join-item"
+						className="btn btn-neutral join-item"
 						disabled={loading || !databases.length || !locales.length}
 					>
 						Lookup

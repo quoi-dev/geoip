@@ -16,6 +16,7 @@ pub struct AppConfig {
 	pub maxmind_download_url: String,
 	pub auto_update: bool,
 	pub auto_update_interval: u64,
+	pub api_key: Option<String>,
 }
 
 impl AppConfig {
@@ -43,6 +44,7 @@ impl AppConfig {
 			.unwrap_or_else(|| "24".to_owned())
 			.parse()
 			.expect("AUTO_UPDATE_INTERVAL must be a valid integer");
+		let api_key = env::var("API_KEY").ok();
 		
 		Arc::new(Self {
 			listen_addr,
@@ -53,6 +55,7 @@ impl AppConfig {
 			maxmind_download_url,
 			auto_update,
 			auto_update_interval,
+			api_key,
 		})
 	}
 }
