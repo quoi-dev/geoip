@@ -1,5 +1,7 @@
 # GeoIP service
 
+Demo: https://geoip.quoi.dev/
+
 ## Quick setup
 
 ```shell
