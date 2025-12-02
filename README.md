@@ -23,7 +23,8 @@ Demo: https://geoip.quoi.dev/
 - Endpoint exposing list of timezone mappings to
   POSIX spec string
 - Fancy Web UI with service status and manual GeoIP lookups
-- Protect Web UI with Recaptcha
+- OpenStreetMap integration for Web UI
+- Protect Web UI with Recaptcha v3
 - OpenAPI spec and Swagger UI
 - Easy-to-use Docker image
 
@@ -33,6 +34,7 @@ Demo: https://geoip.quoi.dev/
 docker run \
   -e MAXMIND_ACCOUNT_ID=XXXX \
   -e MAXMIND_LICENCE_KEY=YYYY \
+  -e OSM_TILES_URL="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" \
   -v geoip_data:/data \
   -p 8080:8080 \
   ghcr.io/quoi-dev/geoip:latest
