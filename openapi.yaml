@@ -68,6 +68,33 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorDTO" }
+        401:
+          description: Unauthorized
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorDTO" }
+        500:
+          description: Internal server error
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorDTO" }
+  
+  /api/timezones:
+    get:
+      operationId: getAllTimezones
+      summary: Get all timezones
+      security: [{ bearer: [] }]
+      responses:
+        200:
+          description: Success
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TimezoneList" }
+        401:
+          description: Unauthorized
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorDTO" }
         500:
           description: Internal server error
           content:
@@ -135,6 +162,7 @@ components:
         metro_code: { type: number }
         postal_code: { type: string }
         timezone: { type: string }
+        posix_timezone: { type: string }
         latitude: { type: number }
         accuracy_radius: { type: number }
         is_in_european_union: { type: boolean }
@@ -150,3 +178,7 @@ components:
         id: { type: number }
         iso_code: { type: string }
         name: { type: string }
+    
+    TimezoneList:
+      type: object
+      additionalProperties: { type: string }

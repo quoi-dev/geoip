@@ -16,7 +16,7 @@ serde = "1"
 maxminddb = { version = "0.26", features = ["mmap"] }
 chrono = { version = "0.4", features = ["serde"] }
 reqwest = { version = "0.12", features = ["rustls-tls", "rustls-tls-native-roots", "json"], default-features = false }
-ahash = "0.8"
+ahash = { version = "0.8", features = ["serde"] }
 tempfile = "3.23"
 flate2 = "1"
 tar = "0.4"

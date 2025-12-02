@@ -2,6 +2,31 @@
 
 Demo: https://geoip.quoi.dev/
 
+## Features
+
+- Very performant thanks to native executable
+- Requester IP detection
+- GeoIP lookups using MaxMind databases
+- Simultaneous serving of several MaxMind database editions
+  (City, ASN etc.)
+- Automatic updates using MaxMind account and licence key or
+  custom download url with or without authorization
+- Serve latest MMDB archive files
+  - One GeoIP service can supply MMDB files to others in order
+    to reduce MaxMind API quota usage
+  - GeoIP service can supply up-to-date files to
+    third-party applications
+- Protect data endpoints with API key
+- `posix_timezone` field computed from `timezone`
+  (useful for embedded devices without timezone database, 
+  e.g. ESP32 and other newlib targets)
+- Endpoint exposing list of timezone mappings to
+  POSIX spec string
+- Fancy Web UI with service status and manual GeoIP lookups
+- Protect Web UI with Recaptcha
+- OpenAPI spec and Swagger UI
+- Easy-to-use Docker image
+
 ## Quick setup
 
 ```shell
@@ -30,9 +55,12 @@ GeoIP service on http://localhost:8080/.
   compressed into `tar.gz`, supports `If-Modified-Since` header.
   Can be used as `MAXMIND_DOWNLOAD_URL` for other instances.
   Can be protected with API key.
+- `GET /api/timezones` - Get all known timezone mappings from
+  ids to POSIX specification (useful for embedded systems
+  without timezone database).
 
-Swagger UI is available on `/swagger-ui`,
-OpenAPI specification is available on `/api/docs`.
+Swagger UI available on `/swagger-ui`,
+OpenAPI specification available on `/api/docs`.
 
 ## Configuration
 

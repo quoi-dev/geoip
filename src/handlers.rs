@@ -1,5 +1,6 @@
 use std::sync::Arc;
 use std::time::{Instant, SystemTime};
+use ahash::AHashMap;
 use axum::extract::{Path, Query, State};
 use axum::{middleware, Json, Router};
 use axum::body::{Body, Bytes};
@@ -32,6 +33,7 @@ pub fn build_router(state: Arc<AppState>) -> Router {
 		.route("/api/status", get(get_status))
 		.route("/api/ip", get(detect_ip))
 		.route("/api/geoip", get(lookup_geoip))
+		.route("/api/timezones", get(get_all_timezones))
 		.route("/api/metrics", get(|| async move { metric_handle.render() }))
 		.merge(
 			SwaggerUi::new("/swagger-ui")
@@ -147,6 +149,13 @@ async fn lookup_geoip(
 		)),
 		Err(err) => Err(err.into()),
 	}
+}
+
+async fn get_all_timezones(
+	State(state): State<Arc<AppState>>,
+	_auth: ApiKeyAuth,
+) -> Json<AHashMap<String, String>> {
+	Json(state.timezones.get_all())
 }
 
 async fn log_internal_server_errors(req: Request<Body>, next: Next) -> Response<Body> {

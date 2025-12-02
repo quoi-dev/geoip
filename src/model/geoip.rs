@@ -71,6 +71,8 @@ pub struct GeoIpInfo {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub timezone: Option<String>,
 	#[serde(skip_serializing_if = "Option::is_none")]
+	pub posix_timezone: Option<String>,
+	#[serde(skip_serializing_if = "Option::is_none")]
 	pub latitude: Option<f64>,
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub longitude: Option<f64>,

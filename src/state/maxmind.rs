@@ -18,6 +18,7 @@ use tokio::io::AsyncWriteExt;
 use tokio::time::MissedTickBehavior;
 use crate::config::{AppConfig, DOWNLOAD_URL_EDITION_PLACEHOLDER};
 use crate::model::{GeoIpDatabaseStatus, GeoIpInfo, GeoIpStatus, GeoNameSubdivision};
+use crate::state::TimezoneService;
 
 #[derive(Debug, Error)]
 pub enum MaxMindServiceError {
@@ -54,6 +55,7 @@ pub struct MaxMindService {
 	me: Weak<Self>,
 	config: Arc<AppConfig>,
 	client: Client,
+	timezones: Arc<TimezoneService>,
 	readers: AHashMap<String, ArcSwapOption<MaxMindDbReader>>,
 	errors: AHashMap<String, ArcSwapOption<String>>,
 	last_update_checks: AHashMap<String, ArcSwapOption<DateTime<Utc>>>,
@@ -64,7 +66,11 @@ static MMDB_FILENAME_PATTERN: LazyLock<Regex> = LazyLock::new(|| Regex::new(
 ).expect("Unable to compile regex"));
 
 impl MaxMindService {
-	pub fn new(config: Arc<AppConfig>, client: Client) -> Arc<Self> {
+	pub fn new(
+		config: Arc<AppConfig>,
+		client: Client,
+		timezones: Arc<TimezoneService>,
+	) -> Arc<Self> {
 		let (
 			readers,
 			errors,
@@ -75,6 +81,7 @@ impl MaxMindService {
 			me: me.clone(),
 			config,
 			client,
+			timezones,
 			readers,
 			errors,
 			last_update_checks,
@@ -525,6 +532,9 @@ impl MaxMindService {
 			metro_code: res.location.as_ref().and_then(|c| c.metro_code),
 			postal_code: res.postal.as_ref().and_then(|c| c.code).map(str::to_owned),
 			timezone: res.location.as_ref().and_then(|c| c.time_zone).map(str::to_owned),
+			posix_timezone: res.location.as_ref()
+				.and_then(|c| c.time_zone)
+				.and_then(|zone| self.timezones.lookup(zone)),
 			latitude: res.location.as_ref().and_then(|c| c.latitude),
 			longitude: res.location.as_ref().and_then(|c| c.longitude),
 			accuracy_radius: res.location.as_ref().and_then(|c| c.accuracy_radius),
