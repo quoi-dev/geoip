@@ -20,6 +20,7 @@ pub struct AppConfig {
 	pub api_key: Option<String>,
 	pub recaptcha_site_key: Option<String>,
 	pub recaptcha_secret_key: Option<String>,
+	pub osm_tiles_url: Option<String>,
 }
 
 impl AppConfig {
@@ -51,6 +52,7 @@ impl AppConfig {
 		let api_key = env::var("API_KEY").ok();
 		let recaptcha_site_key = env::var("RECAPTCHA_SITE_KEY").ok();
 		let recaptcha_secret_key = env::var("RECAPTCHA_SECRET_KEY").ok();
+		let osm_tiles_url = env::var("OSM_TILES_URL").ok();
 		
 		Arc::new(Self {
 			listen_addr,
@@ -65,6 +67,7 @@ impl AppConfig {
 			api_key,
 			recaptcha_site_key,
 			recaptcha_secret_key,
+			osm_tiles_url,
 		})
 	}
 }

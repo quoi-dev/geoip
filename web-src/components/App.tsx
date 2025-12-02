@@ -9,6 +9,7 @@ import { ConfirmDialog } from "./ConfirmDialog.tsx";
 
 export interface PageCtx {
 	recaptcha_site_key?: string;
+	osm_tiles_url?: string;
 }
 
 const API_KEY_STORAGE_KEY = "geoip.api-key";
@@ -116,7 +117,11 @@ export const App: React.FC = () => {
 			{error && (<div className="alert alert-error alert-soft mb-4">
 				{error}
 			</div>)}
-			<GeoIpForm databases={status?.databases ?? []} recaptchaFn={recaptchaFn} />
+			<GeoIpForm
+				databases={status?.databases ?? []}
+				recaptchaFn={recaptchaFn}
+				osmTilesUrl={pageCtx?.osm_tiles_url ?? undefined}
+			/>
 			{status && <GeoIpStatus status={status} />}
 			<footer className="footer sm:footer-horizontal footer-center">
 				<aside>

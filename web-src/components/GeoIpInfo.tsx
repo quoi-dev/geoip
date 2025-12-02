@@ -9,7 +9,7 @@ export interface GeoIpInfoProps {
 export const GeoIpInfo: React.FC<GeoIpInfoProps> = ({info}) => {
 	return (
 		<div className="overflow-x-auto">
-			<table className="table">
+			<table className="table table-sm">
 				<tbody>
 					<GeoIpInfoRows info={info} />
 				</tbody>

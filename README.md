@@ -96,6 +96,9 @@ OpenAPI specification available on `/api/docs`.
   Recaptcha script will be injected to frontend only 
   if site key is set.
 - `RECAPTCHA_SECRET_KEY` (optional) - To be used with `RECAPTCHA_SITE_KEY`.
+- `OSM_TILES_URL` (optional) - Render OpenStreetMap centered on detected location.
+  You can use `https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png` as a starting point
+  and switch to your own tile server if traffic increases.
 
 If `MAXMIND_ACCOUNT_ID` or `MAXMIND_DOWNLOAD_URL` are set, 
 automatic updates are enabled, otherwise you need to download,

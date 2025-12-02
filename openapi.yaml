@@ -164,6 +164,7 @@ components:
         timezone: { type: string }
         posix_timezone: { type: string }
         latitude: { type: number }
+        longitude: { type: number }
         accuracy_radius: { type: number }
         is_in_european_union: { type: boolean }
         is_anonymous_proxy: { type: boolean }

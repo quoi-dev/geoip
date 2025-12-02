@@ -4,4 +4,6 @@ use serde::{Deserialize, Serialize};
 pub struct IndexPageCtx {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub recaptcha_site_key: Option<String>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub osm_tiles_url: Option<String>,
 }

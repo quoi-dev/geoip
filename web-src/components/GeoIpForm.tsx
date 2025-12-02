@@ -2,6 +2,8 @@ import React, { type FormEvent, useCallback, useEffect, useMemo, useState } from
 import { useForm } from "react-hook-form";
 import * as api from "../client";
 import { GeoIpInfo } from "./GeoIpInfo.tsx";
+import { GeoIpMap } from "./GeoIpMap.tsx";
+import classNames from "classnames";
 
 const EDITION_STORAGE_KEY = "geoip.edition";
 const LOCALE_STORAGE_KEY = "geoip.locale";
@@ -13,9 +15,14 @@ interface GeoIpFormData {
 export interface GeoIpFormProps {
 	databases: api.GeoIpDatabaseStatus[];
 	recaptchaFn?: () => Promise<string | undefined>;
+	osmTilesUrl?: string;
 }
 
-export const GeoIpForm: React.FC<GeoIpFormProps> = ({databases, recaptchaFn}) => {
+export const GeoIpForm: React.FC<GeoIpFormProps> = ({
+	databases,
+	recaptchaFn,
+	osmTilesUrl,
+}) => {
 	const {register, handleSubmit, setValue, getValues} = useForm<GeoIpFormData>();
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
@@ -183,18 +190,29 @@ export const GeoIpForm: React.FC<GeoIpFormProps> = ({databases, recaptchaFn}) =>
 			{error && (<div className="alert alert-error alert-soft mb-4">
 				{error}
 			</div>)}
-			{result && (
-				<>
-					<div className="alert alert-success alert-soft mb-4">
-						{(result.elapsed * 1000).toFixed(3)}ms elapsed
-					</div>
-					<div className="card bg-base-200 w-full shadow-sm mb-4">
+			{result && (<div className="alert alert-success alert-soft mb-4">
+				{(result.elapsed * 1000).toFixed(3)}ms elapsed
+			</div>)}
+			{osmTilesUrl !== undefined ?
+				(<div
+					className={classNames(
+						"grid", "grid-cols-1", "gap-4", "mb-4", {
+							"md:grid-cols-2": result?.info?.accuracy_radius !== undefined,
+						}
+					)}
+				>
+					{result && (<div className="card bg-base-200 shadow-sm">
 						<div className="card-body">
 							{result.info ? (<GeoIpInfo info={result.info} />) : "No result"}
 						</div>
+					</div>)}
+					<GeoIpMap className="order-first md:order-last" osmTilesUrl={osmTilesUrl} info={result?.info} />
+				</div>) :
+				(result && (<div className="card bg-base-200 w-full shadow-sm mb-4">
+					<div className="card-body">
+						{result.info ? (<GeoIpInfo info={result.info} />) : "No result"}
 					</div>
-				</>
-			)}
+				</div>))}
 		</>
 	);
 };

@@ -35,6 +35,7 @@ impl TemplateService {
 	pub fn index_ctx(&self) -> IndexPageCtx {
 		IndexPageCtx {
 			recaptcha_site_key: self.config.recaptcha_site_key.clone(),
+			osm_tiles_url: self.config.osm_tiles_url.clone(),
 		}
 	}
 	
