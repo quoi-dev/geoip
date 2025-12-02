@@ -22,11 +22,19 @@ impl AuthMode for ApiKeyOrRecaptchaAuthMode {
 	const ACCEPT_RECAPTCHA_TOKEN: bool = true;
 }
 
+pub struct ApiKeyAuthMode;
+
+impl AuthMode for ApiKeyAuthMode {
+	const ACCEPT_API_KEY: bool = true;
+	const ACCEPT_RECAPTCHA_TOKEN: bool = false;
+}
+
 pub struct Auth<Mode: AuthMode> {
 	_phantom: PhantomData<Mode>,
 }
 
 pub type ApiKeyOrRecaptchaAuth = Auth<ApiKeyOrRecaptchaAuthMode>;
+pub type ApiKeyAuth = Auth<ApiKeyAuthMode>;
 
 impl<Mode: AuthMode> FromRequestParts<Arc<AppState>> for Auth<Mode> {
 	type Rejection = StatusCode;

@@ -12,6 +12,7 @@ pub struct AppConfig {
 	pub data_dir: PathBuf,
 	pub maxmind_account_id: Option<String>,
 	pub maxmind_license_key: Option<String>,
+	pub maxmind_bearer_token: Option<String>,
 	pub maxmind_editions: Vec<String>,
 	pub maxmind_download_url: String,
 	pub auto_update: bool,
@@ -32,6 +33,7 @@ impl AppConfig {
 			.expect("DATA_DIR must be set");
 		let maxmind_account_id = env::var("MAXMIND_ACCOUNT_ID").ok();
 		let maxmind_license_key = env::var("MAXMIND_LICENCE_KEY").ok();
+		let maxmind_bearer_token = env::var("MAXMIND_BEARER_TOKEN").ok();
 		let maxmind_editions = env::var("MAXMIND_EDITIONS").ok()
 			.unwrap_or_else(|| DEFAULT_EDITIONS.to_owned())
 			.split(',')
@@ -55,6 +57,7 @@ impl AppConfig {
 			data_dir,
 			maxmind_account_id,
 			maxmind_license_key,
+			maxmind_bearer_token,
 			maxmind_editions,
 			maxmind_download_url,
 			auto_update,

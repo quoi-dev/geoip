@@ -294,9 +294,12 @@ impl MaxMindService {
 		if let Some(username) = &self.config.maxmind_account_id {
 			info!("Using HTTP basic auth");
 			req = req.basic_auth(username, self.config.maxmind_license_key.as_ref());
+		} else if let Some(bearer_token) = &self.config.maxmind_bearer_token {
+			info!("Using HTTP bearer auth");
+			req = req.bearer_auth(bearer_token);
 		}
 		if let Some(mtime) = mtime {
-			let mtime_str = mtime.to_rfc2822();
+			let mtime_str = httpdate::fmt_http_date(mtime.into());
 			info!("Using If-Modified-Since: {mtime_str}");
 			req = req.header(header::IF_MODIFIED_SINCE, mtime_str);
 		}
@@ -391,6 +394,16 @@ impl MaxMindService {
 			}
 		}
 		Ok(false)
+	}
+	
+	pub fn get_edition_path_and_mtime(
+		&self,
+		edition: &str,
+	) -> Option<(PathBuf, DateTime<Utc>, impl Drop + 'static)> {
+		let reader = self.readers.get(edition)?;
+		let reader = reader.load_full()?;
+		let (_, mtime) = Self::parse_edition_and_mtime_from_path(&reader.path)?;
+		Some((reader.path.clone(), mtime, reader))
 	}
 	
 	fn get_edition_mtime(&self, edition: &str) -> Option<DateTime<Utc>> {

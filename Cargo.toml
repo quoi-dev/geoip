@@ -29,3 +29,5 @@ metrics = "0.24"
 tower-http = { version = "0.6", features = ["fs"] }
 handlebars = "6.3"
 constant_time_eq = "0.4"
+futures = "0.3"
+httpdate = "1"

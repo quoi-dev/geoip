@@ -22,9 +22,14 @@ GeoIP service on http://localhost:8080/.
 ## Endpoints
 
 - `GET /api/status` - Query system status 
-  (database versions etc)
-- `GET /api/ip` - Detect requester IP
-- `GET /api/geoip` - Perform GeoIP lookup
+  (database versions etc).
+- `GET /api/ip` - Detect requester IP.
+- `GET /api/geoip` - Perform GeoIP lookup.
+  Can be protected with API key.
+- `GET /files/mmdb/{edition}` - Download latest MMDB database
+  compressed into `tar.gz`, supports `If-Modified-Since` header.
+  Can be used as `MAXMIND_DOWNLOAD_URL` for other instances.
+  Can be protected with API key.
 
 Swagger UI is available on `/swagger-ui`,
 OpenAPI specification is available on `/api/docs`.
@@ -43,14 +48,21 @@ OpenAPI specification is available on `/api/docs`.
   database editions to use (defaults to `GeoLite2-City`)
 - `MAXMIND_DOWNLOAD_URL` (optional) - MaxMind database
   download url. You can use `{edition}` placeholder.
-  Defaults to `https://download.maxmind.com/geoip/databases/{edition}/download?suffix=tar.gz`
+  Defaults to `https://download.maxmind.com/geoip/databases/{edition}/download?suffix=tar.gz`.
+  You can point download url to another GeoIP service instance
+  (e.g. `http://my-geoip-svc/files/mmdb/{edition}`).
+- `MAXMIND_BEARER_TOKEN` (optional) - Use bearer token for
+  `MAXMIND_DOWNLOAD_URL`. Useful if download urls points to
+  another GeoIP service instance with `API_KEY` set.
 - `AUTO_UPDATE_INTERVAL` (optional) - Auto-update interval 
   in hours. Defaults to 24 hours.
-- `API_KEY` (optional) - Protect `/api/geoip` endpoint 
-  with given bearer token.
+- `API_KEY` (optional) - Protect `/api/geoip` and 
+  `/files/**` endpoints with given bearer token.
 - `RECAPTCHA_SITE_KEY` (optional) - Protect `/api/geoip` endpoint
   with Recaptcha v3. `API_KEY` bypasses captcha check,
-  Recaptcha bypasses `API_KEY` requirement, if both are set.
+  Recaptcha bypasses `API_KEY` requirement (only for `/api/geoip`), 
+  if both are set. `RECAPTCHA_SITE_KEY` makes no sense without
+  API key set.
   For demo purposes on https://geoip.quoi.dev. You can get
   Recaptcha site key on https://www.google.com/recaptcha/admin/create.
   Recaptcha script will be injected to frontend only 
@@ -89,3 +101,4 @@ using provided `Dockerfile`.
 - TailwindCSS
 - DaisyUI
 - MaxMind GeoLite2
+- OpenAPI

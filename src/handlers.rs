@@ -1,17 +1,20 @@
 use std::sync::Arc;
-use std::time::Instant;
-use axum::extract::{Query, State};
+use std::time::{Instant, SystemTime};
+use axum::extract::{Path, Query, State};
 use axum::{middleware, Json, Router};
 use axum::body::{Body, Bytes};
-use axum::http::{Request, Response, StatusCode};
+use axum::http::{header, Request, Response, StatusCode};
 use axum::middleware::Next;
 use axum::response::{Html, IntoResponse};
 use axum::routing::get;
+use axum_extra::headers::{ContentLength, ContentType, IfModifiedSince, LastModified};
+use axum_extra::TypedHeader;
 use log::error;
 use metrics::histogram;
+use tokio::io::AsyncReadExt;
 use tower_http::services::{ServeDir, ServeFile};
 use utoipa_swagger_ui::SwaggerUi;
-use crate::extractors::{ApiKeyOrRecaptchaAuth, ClientIp};
+use crate::extractors::{ApiKeyAuth, ApiKeyOrRecaptchaAuth, ClientIp};
 use crate::model::{ErrorDTO, GeoIpLookupQuery, GeoIpLookupResult, GeoIpStatus, IndexPageCtx, IpDetectResult};
 use crate::state::{AppState, MaxMindServiceError};
 
@@ -41,6 +44,7 @@ pub fn build_router(state: Arc<AppState>) -> Router {
 		.route("/", get(get_index_page))
 		.route_service("/favicon.ico", ServeFile::new("dist/favicon.ico"))
 		.nest_service("/static", ServeDir::new("dist/static").precompressed_gzip())
+		.route("/files/mmdb/{edition}", get(download_mmdb_archive_file))
 		.layer(middleware::from_fn(log_internal_server_errors))
 		.layer(prometheus_layer)
 		.with_state(state)
@@ -57,6 +61,51 @@ async fn get_index_page_ctx(State(state): State<Arc<AppState>>) -> Json<IndexPag
 
 async fn get_status(State(state): State<Arc<AppState>>) -> Json<GeoIpStatus> {
 	Json(state.maxmind.status())
+}
+
+async fn download_mmdb_archive_file(
+	State(state): State<Arc<AppState>>,
+	_auth: ApiKeyAuth,
+	Path(edition): Path<String>,
+	if_modified_since: Option<TypedHeader<IfModifiedSince>>,
+) -> Result<axum::response::Response, ErrorDTO> {
+	let (path, mtime, handle) = state.maxmind.get_edition_path_and_mtime(&edition)
+		.ok_or(ErrorDTO::new_static(StatusCode::NOT_FOUND, "Not found"))?;
+	if let Some(if_modified_since) = if_modified_since {
+		if !if_modified_since.is_modified(mtime.into()) {
+			return Ok((
+				StatusCode::NOT_MODIFIED,
+				TypedHeader(LastModified::from(SystemTime::from(mtime))),
+			).into_response());
+		}
+	}
+	let path = path.with_extension("tar.gz");
+	let file = tokio::fs::File::open(&path).await?;
+	let metadata = file.metadata().await?;
+	let len = metadata.len();
+	let stream = Body::from_stream(futures::stream::unfold(
+		Some((file, handle)),
+		|state| async move {
+			let (mut file, handle) = state?;
+			let mut buf = [0u8; 8192];
+			match file.read(&mut buf).await {
+				Ok(0) => None,
+				Ok(count) => {
+					let bytes = Bytes::copy_from_slice(&buf[..count]);
+					Some((Ok(bytes), Some((file, handle))))
+				},
+				Err(err) => Some((Err(err), None))
+			}
+		}
+	));
+	Ok((
+		StatusCode::OK,
+		[(header::CONTENT_DISPOSITION, format!("attachment; filename=\"{edition}.tar.gz\""))],
+		TypedHeader(LastModified::from(SystemTime::from(mtime))),
+		TypedHeader(ContentType::octet_stream()),
+		TypedHeader(ContentLength(len)),
+		stream,
+	).into_response())
 }
 
 async fn detect_ip(ClientIp(client_ip): ClientIp) -> Json<IpDetectResult> {
