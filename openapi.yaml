@@ -10,6 +10,7 @@ paths:
   /api/status:
     get:
       operationId: getStatus
+      summary: Get service status (database versions etc.)
       responses:
         200:
           description: Success
@@ -25,6 +26,7 @@ paths:
   /api/ip:
     get:
       operationId: detectIp
+      summary: Detect requester IP address
       responses:
         200:
           description: Success
@@ -40,16 +42,20 @@ paths:
   /api/geoip:
     get:
       operationId: lookupGeoIp
+      summary: Perform GeoIP database lookup
       security: [{ bearer: [] }]
       parameters:
         - in: query
           name: ip
+          description: Defaults to requester IP address
           schema: { type: string }
         - in: query
           name: locale
+          description: Defaults to "en"
           schema: { type: string }
         - in: query
           name: edition
+          description: Defaults to first edition listed in the configuration
           schema: { type: string }
       responses:
         200:

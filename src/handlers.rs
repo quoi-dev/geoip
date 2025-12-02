@@ -32,7 +32,10 @@ pub fn build_router(state: Arc<AppState>) -> Router {
 		.merge(
 			SwaggerUi::new("/swagger-ui")
 				.external_url_unchecked("/api/docs", openapi_spec)
-				.config(utoipa_swagger_ui::Config::default().persist_authorization(true))
+				.config(utoipa_swagger_ui::Config::default()
+					.display_operation_id(true)
+					.persist_authorization(true)
+				)
 		)
 		.route_service("/", ServeFile::new("dist/index.html"))
 		.route_service("/favicon.ico", ServeFile::new("dist/favicon.ico"))
