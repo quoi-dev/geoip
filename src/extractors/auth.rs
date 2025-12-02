@@ -6,6 +6,7 @@ use axum::http::StatusCode;
 use axum_extra::headers::Authorization;
 use axum_extra::headers::authorization::Bearer;
 use axum_extra::TypedHeader;
+use constant_time_eq::constant_time_eq;
 use log::error;
 use crate::state::AppState;
 
@@ -42,7 +43,7 @@ impl<Mode: AuthMode> FromRequestParts<Arc<AppState>> for Auth<Mode> {
 				.await
 				.ok();
 			if let Some(auth) = auth {
-				if auth.token() == expected_token {
+				if constant_time_eq(auth.token().as_bytes(), expected_token.as_bytes()) {
 					return Ok(Self { _phantom: PhantomData });
 				}
 			}
