@@ -52,7 +52,7 @@ OpenAPI specification is available on `/api/docs`.
   You can point download url to another GeoIP service instance
   (e.g. `http://my-geoip-svc/files/mmdb/{edition}`).
 - `MAXMIND_BEARER_TOKEN` (optional) - Use bearer token for
-  `MAXMIND_DOWNLOAD_URL`. Useful if download urls points to
+  `MAXMIND_DOWNLOAD_URL`. Useful if download url points to
   another GeoIP service instance with `API_KEY` set.
 - `AUTO_UPDATE_INTERVAL` (optional) - Auto-update interval 
   in hours. Defaults to 24 hours.
