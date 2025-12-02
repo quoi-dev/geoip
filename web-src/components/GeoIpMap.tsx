@@ -25,11 +25,11 @@ export const GeoIpMap: React.FC<GeoIpMapProps> = ({className, info, osmTilesUrl}
 	const radius = info?.accuracy_radius !== undefined ? info.accuracy_radius * 1000 : undefined;
 	
 	return (
-		<div className={classNames(className, {"hidden": !info})}>
+		<div className={classNames(className, {"hidden": !center || radius === undefined})}>
 			<div className={classNames("card", "bg-base-200", "shadow-sm")}>
 				<div className="card-body">
 					{
-						(center && radius !== undefined) ? (
+						(center && radius !== undefined) && (
 							<MapContainer
 								center={center}
 								zoom={4}
@@ -42,7 +42,7 @@ export const GeoIpMap: React.FC<GeoIpMapProps> = ({className, info, osmTilesUrl}
 								<Circle center={center} radius={radius} />
 								<FitCircle center={center} radius={radius} />
 							</MapContainer>
-						) : (<p>No location data</p>)
+						)
 					}
 				</div>
 			</div>
