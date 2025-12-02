@@ -108,7 +108,11 @@ export const App: React.FC = () => {
 	
 	return (
 		<div className="container mx-auto p-4">
-			<h1 className="text-center text-2xl mb-4">GeoIP</h1>
+			<h1 className="text-center text-2xl mb-4">
+				<a className="link" href="/">
+					GeoIP
+				</a>
+			</h1>
 			{error && (<div className="alert alert-error alert-soft mb-4">
 				{error}
 			</div>)}

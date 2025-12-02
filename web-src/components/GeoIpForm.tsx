@@ -16,7 +16,7 @@ export interface GeoIpFormProps {
 }
 
 export const GeoIpForm: React.FC<GeoIpFormProps> = ({databases, recaptchaFn}) => {
-	const {register, handleSubmit, setValue} = useForm<GeoIpFormData>();
+	const {register, handleSubmit, setValue, getValues} = useForm<GeoIpFormData>();
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const [result, setResult] = useState<api.GeoIpLookupResult | null>(null);
@@ -24,8 +24,22 @@ export const GeoIpForm: React.FC<GeoIpFormProps> = ({databases, recaptchaFn}) =>
 	const [locale, setLocale] = useState("");
 	
 	useEffect(() => {
+		const handler = () => {
+			const ip = location.hash.substring(1);
+			if (ip === "") return;
+			const old = getValues("ip");
+			if (ip === old) return;
+			setValue("ip", ip);
+		};
+		handler();
+		window.addEventListener("hashchange", handler);
+		return () => window.removeEventListener("hashchange", handler);
+	}, []);
+	
+	useEffect(() => {
 		(async () => {
 			try {
+				if (getValues("ip") !== "") return;
 				setError(null);
 				setLoading(true);
 				const res = await api.detectIp();
@@ -89,6 +103,7 @@ export const GeoIpForm: React.FC<GeoIpFormProps> = ({databases, recaptchaFn}) =>
 				setError(null);
 				setResult(null);
 				setLoading(true);
+				location.hash = `#${data.ip}`;
 				const recaptchaToken = recaptchaFn ? await recaptchaFn() : undefined;
 				const headers: Record<string, string> = {};
 				if (recaptchaToken !== undefined) {
