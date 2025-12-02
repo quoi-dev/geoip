@@ -21,6 +21,7 @@
 		"@rsbuild/core": "^1.6.7",
 		"@rsbuild/plugin-react": "^1.4.2",
 		"@tailwindcss/postcss": "^4.1.17",
+		"@types/grecaptcha": "^3.0.9",
 		"@types/react": "^19.2.6",
 		"@types/react-dom": "^19.2.3",
 		"compression-webpack-plugin": "^11.1.0",

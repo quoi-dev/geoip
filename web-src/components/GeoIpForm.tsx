@@ -12,9 +12,10 @@ interface GeoIpFormData {
 
 export interface GeoIpFormProps {
 	databases: api.GeoIpDatabaseStatus[];
+	recaptchaFn?: () => Promise<string | undefined>;
 }
 
-export const GeoIpForm: React.FC<GeoIpFormProps> = ({databases}) => {
+export const GeoIpForm: React.FC<GeoIpFormProps> = ({databases, recaptchaFn}) => {
 	const {register, handleSubmit, setValue} = useForm<GeoIpFormData>();
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
@@ -88,12 +89,18 @@ export const GeoIpForm: React.FC<GeoIpFormProps> = ({databases}) => {
 				setError(null);
 				setResult(null);
 				setLoading(true);
+				const recaptchaToken = recaptchaFn ? await recaptchaFn() : undefined;
+				const headers: Record<string, string> = {};
+				if (recaptchaToken !== undefined) {
+					headers["X-Recaptcha-Token"] = recaptchaToken;
+				}
 				const res = await api.lookupGeoIp({
 					query: {
 						ip: data.ip,
 						edition,
 						locale,
 					},
+					headers,
 				});
 				if (res.error) {
 					setError(res.error.error ?? `Error ${res.response.status}`);
@@ -106,7 +113,7 @@ export const GeoIpForm: React.FC<GeoIpFormProps> = ({databases}) => {
 				setLoading(false);
 			}
 		})(evt);
-	}, [edition, locale]);
+	}, [edition, locale, recaptchaFn]);
 
 	const handleEditionChange = useCallback((evt: React.ChangeEvent<HTMLSelectElement>) => {
 		setEdition(evt.target.value);

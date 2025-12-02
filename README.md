@@ -48,6 +48,14 @@ OpenAPI specification is available on `/api/docs`.
   in hours. Defaults to 24 hours.
 - `API_KEY` (optional) - Protect `/api/geoip` endpoint 
   with given bearer token.
+- `RECAPTCHA_SITE_KEY` (optional) - Protect `/api/geoip` endpoint
+  with Recaptcha v3. `API_KEY` bypasses captcha check,
+  Recaptcha bypasses `API_KEY` requirement, if both are set.
+  For demo purposes on https://geoip.quoi.dev. You can get
+  Recaptcha site key on https://www.google.com/recaptcha/admin/create.
+  Recaptcha script will be injected to frontend only 
+  if site key is set.
+- `RECAPTCHA_SECRET_KEY` (optional) - To be used with `RECAPTCHA_SITE_KEY`.
 
 If `MAXMIND_ACCOUNT_ID` or `MAXMIND_DOWNLOAD_URL` are set, 
 automatic updates are enabled, otherwise you need to download,

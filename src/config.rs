@@ -17,6 +17,8 @@ pub struct AppConfig {
 	pub auto_update: bool,
 	pub auto_update_interval: u64,
 	pub api_key: Option<String>,
+	pub recaptcha_site_key: Option<String>,
+	pub recaptcha_secret_key: Option<String>,
 }
 
 impl AppConfig {
@@ -45,6 +47,8 @@ impl AppConfig {
 			.parse()
 			.expect("AUTO_UPDATE_INTERVAL must be a valid integer");
 		let api_key = env::var("API_KEY").ok();
+		let recaptcha_site_key = env::var("RECAPTCHA_SITE_KEY").ok();
+		let recaptcha_secret_key = env::var("RECAPTCHA_SECRET_KEY").ok();
 		
 		Arc::new(Self {
 			listen_addr,
@@ -56,6 +60,8 @@ impl AppConfig {
 			auto_update,
 			auto_update_interval,
 			api_key,
+			recaptcha_site_key,
+			recaptcha_secret_key,
 		})
 	}
 }

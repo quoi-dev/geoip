@@ -13,6 +13,7 @@ export default defineConfig({
 	html: {
 		title: "GeoIP",
 		favicon: "./public/favicon.ico",
+		template: "./web-src/index.html",
 	},
 	server: {
 		proxy: {

@@ -5,14 +5,14 @@ use axum::{middleware, Json, Router};
 use axum::body::{Body, Bytes};
 use axum::http::{Request, Response, StatusCode};
 use axum::middleware::Next;
-use axum::response::IntoResponse;
+use axum::response::{Html, IntoResponse};
 use axum::routing::get;
 use log::error;
 use metrics::histogram;
 use tower_http::services::{ServeDir, ServeFile};
 use utoipa_swagger_ui::SwaggerUi;
-use crate::extractors::{Auth, ClientIp};
-use crate::model::{ErrorDTO, GeoIpLookupQuery, GeoIpLookupResult, GeoIpStatus, IpDetectResult};
+use crate::extractors::{ApiKeyOrRecaptchaAuth, ClientIp};
+use crate::model::{ErrorDTO, GeoIpLookupQuery, GeoIpLookupResult, GeoIpStatus, IndexPageCtx, IpDetectResult};
 use crate::state::{AppState, MaxMindServiceError};
 
 pub fn build_router(state: Arc<AppState>) -> Router {
@@ -25,6 +25,7 @@ pub fn build_router(state: Arc<AppState>) -> Router {
 	) = axum_prometheus::PrometheusMetricLayer::pair();
 	
 	Router::new()
+		.route("/api/ctx", get(get_index_page_ctx))
 		.route("/api/status", get(get_status))
 		.route("/api/ip", get(detect_ip))
 		.route("/api/geoip", get(lookup_geoip))
@@ -37,12 +38,21 @@ pub fn build_router(state: Arc<AppState>) -> Router {
 					.persist_authorization(true)
 				)
 		)
-		.route_service("/", ServeFile::new("dist/index.html"))
+		.route("/", get(get_index_page))
 		.route_service("/favicon.ico", ServeFile::new("dist/favicon.ico"))
 		.nest_service("/static", ServeDir::new("dist/static").precompressed_gzip())
 		.layer(middleware::from_fn(log_internal_server_errors))
 		.layer(prometheus_layer)
 		.with_state(state)
+}
+
+async fn get_index_page(State(state): State<Arc<AppState>>) -> Result<Html<String>, ErrorDTO> {
+	let html = state.templates.render_index()?;
+	Ok(Html(html))
+}
+
+async fn get_index_page_ctx(State(state): State<Arc<AppState>>) -> Json<IndexPageCtx> {
+	Json(state.templates.index_ctx())
 }
 
 async fn get_status(State(state): State<Arc<AppState>>) -> Json<GeoIpStatus> {
@@ -58,7 +68,7 @@ async fn detect_ip(ClientIp(client_ip): ClientIp) -> Json<IpDetectResult> {
 async fn lookup_geoip(
 	State(state): State<Arc<AppState>>,
 	ClientIp(client_ip): ClientIp,
-	_auth: Auth,
+	_auth: ApiKeyOrRecaptchaAuth,
 	Query(query): Query<GeoIpLookupQuery>,
 ) -> Result<Json<GeoIpLookupResult>, ErrorDTO> {
 	let start = Instant::now();
