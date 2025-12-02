@@ -21,7 +21,7 @@ Demo: https://geoip.quoi.dev/
   (useful for embedded devices without timezone database, 
   e.g. ESP32 and other newlib targets)
 - Endpoint exposing list of timezone mappings to
-  POSIX spec string
+  POSIX spec strings
 - Fancy Web UI with service status and manual GeoIP lookups
 - OpenStreetMap integration for Web UI
 - Protect Web UI with Recaptcha v3
@@ -34,7 +34,7 @@ Demo: https://geoip.quoi.dev/
 docker run \
   -e MAXMIND_ACCOUNT_ID=XXXX \
   -e MAXMIND_LICENCE_KEY=YYYY \
-  -e OSM_TILES_URL="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" \
+  -e OSM_TILES_URL="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" \ # Optional, but fancy
   -v geoip_data:/data \
   -p 8080:8080 \
   ghcr.io/quoi-dev/geoip:latest
@@ -59,7 +59,7 @@ GeoIP service on http://localhost:8080/.
   Can be protected with API key.
 - `GET /api/timezones` - Get all known timezone mappings from
   ids to POSIX specification (useful for embedded systems
-  without timezone database).
+  without timezone database). Can be protected with API key.
 
 Swagger UI available on `/swagger-ui`,
 OpenAPI specification available on `/api/docs`.
@@ -86,7 +86,7 @@ OpenAPI specification available on `/api/docs`.
   another GeoIP service instance with `API_KEY` set.
 - `AUTO_UPDATE_INTERVAL` (optional) - Auto-update interval 
   in hours. Defaults to 24 hours.
-- `API_KEY` (optional) - Protect `/api/geoip` and 
+- `API_KEY` (optional) - Protect `/api/geoip`, `/api/timezones` and 
   `/files/**` endpoints with given bearer token.
 - `RECAPTCHA_SITE_KEY` (optional) - Protect `/api/geoip` endpoint
   with Recaptcha v3. `API_KEY` bypasses captcha check,
