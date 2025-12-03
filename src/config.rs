@@ -26,6 +26,7 @@ pub struct AppConfig {
 	pub tzdata_download_url: String,
 	pub tzdata_bearer_token: Option<String>,
 	pub zic_path: Option<String>,
+	pub google_tag_id: Option<String>,
 }
 
 impl AppConfig {
@@ -66,6 +67,7 @@ impl AppConfig {
 			.unwrap_or_else(|| TZDATA_DOWNLOAD_URL.to_owned());
 		let tzdata_bearer_token = env::var("TZDATA_BEARER_TOKEN").ok();
 		let zic_path = env::var("ZIC_PATH").ok();
+		let google_tag_id = env::var("GOOGLE_TAG_ID").ok();
 		
 		Arc::new(Self {
 			listen_addr,
@@ -85,6 +87,7 @@ impl AppConfig {
 			tzdata_download_url,
 			tzdata_bearer_token,
 			zic_path,
+			google_tag_id,
 		})
 	}
 }

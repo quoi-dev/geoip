@@ -7,5 +7,18 @@
 </head>
 <body>
 	<div id="<%= mountId %>"></div>
+	<div class="hidden">
+		{{#if google_tag_id}}
+		<!-- Google tag (gtag.js) -->
+		<script async src="https://www.googletagmanager.com/gtag/js?id={{google_tag_id}}"></script>
+		<script>
+			window.dataLayer = window.dataLayer || [];
+			function gtag(){dataLayer.push(arguments);}
+			gtag('js', new Date());
+			
+			gtag('config', '{{google_tag_id}}');
+		</script>
+		{{/if}}
+	</div>
 </body>
 </html>

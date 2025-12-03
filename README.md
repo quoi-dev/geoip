@@ -122,6 +122,9 @@ OpenAPI specification available on `/api/docs`.
   without `tzdata` and `tzdata-utils` packages or Windows). In this case timezone
   database auto-updates will be disabled, but you can specify
   `zic` executable path override and re-enable auto-updates.
+- `GOOGLE_TAG_ID` (optional) - Enable Google Analytics integration.
+  If this variable is not set, no Google Analytics scripts 
+  will be injected to the page.
 
 If `MAXMIND_ACCOUNT_ID` or `MAXMIND_DOWNLOAD_URL` are set, 
 GeoIP database automatic updates enabled, otherwise 

@@ -41,7 +41,10 @@ impl TemplateService {
 	
 	pub fn render_index(&self) -> Result<String, TemplateServiceError> {
 		let ctx = serde_json::to_string(&self.index_ctx())?;
-		let html = self.handlebars.render("index", &json!({"ctx": ctx}))?;
+		let html = self.handlebars.render("index", &json!({
+			"ctx": ctx,
+			"google_tag_id": &self.config.google_tag_id,
+		}))?;
 		Ok(html)
 	}
 }
