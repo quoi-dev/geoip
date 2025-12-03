@@ -2,6 +2,8 @@
 
 Demo: https://geoip.quoi.dev/
 
+![Screenshot](/screenshot.png)
+
 ## Features
 
 - Very performant thanks to native executable
