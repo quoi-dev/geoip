@@ -160,3 +160,7 @@ using provided `Dockerfile`.
 - DaisyUI
 - MaxMind GeoLite2
 - OpenAPI
+
+## License
+
+MIT
