@@ -119,7 +119,7 @@ OpenAPI specification available on `/api/docs`.
 - `ZIC_PATH` (optional) - Timezone database compiler executable path.
   GeoIP service tries to use system compiler (`zic` command),
   but it might fail to find it on some systems (e.g. Alpine 
-  without `tzdata` package or Windows). In this case timezone
+  without `tzdata` and `tzdata-utils` packages or Windows). In this case timezone
   database auto-updates will be disabled, but you can specify
   `zic` executable path override and re-enable auto-updates.
 
