@@ -250,6 +250,7 @@ impl TimezoneService {
 			"northamerica",
 			"southamerica",
 			"backward",
+			"factory",
 		];
 		for tz_file in TZ_FILES {
 			cmd.arg(tz_file);
