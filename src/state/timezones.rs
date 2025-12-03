@@ -279,4 +279,8 @@ impl TimezoneService {
 			.as_ref()
 			.and_then(|zones| zones.get(id).cloned())
 	}
+	
+	pub fn get_archive(&self) -> Option<Arc<ArchiveFileInfo>> {
+		self.files.get_latest_archive("tzdata")
+	}
 }

@@ -45,6 +45,7 @@ pub fn build_router(state: Arc<AppState>) -> Router {
 		.route("/", get(get_index_page))
 		.route_service("/favicon.ico", ServeFile::new("dist/favicon.ico"))
 		.nest_service("/static", ServeDir::new("dist/static").precompressed_gzip())
+		.route("/files/tzdata", get(download_tzdata_archive_file))
 		.route("/files/mmdb/{edition}", get(download_mmdb_archive_file))
 		.layer(middleware::from_fn(log_internal_server_errors))
 		.layer(prometheus_layer)
@@ -64,15 +65,41 @@ async fn get_status(State(state): State<Arc<AppState>>) -> Json<GeoIpStatus> {
 	Json(state.maxmind.status())
 }
 
+async fn download_tzdata_archive_file(
+	State(state): State<Arc<AppState>>,
+	_auth: ApiKeyAuth,
+	if_modified_since: Option<TypedHeader<IfModifiedSince>>,
+) -> Result<axum::response::Response, ErrorDTO> {
+	let info = state.timezones.get_archive().ok_or_else(|| ErrorDTO::new_static(
+		StatusCode::NOT_FOUND,
+		"File not found",
+	))?;
+	let res = state.files.download_archive(
+		info,
+		"tzdata.tar.gz",
+		if_modified_since,
+	).await?;
+	Ok(res)
+}
+
 async fn download_mmdb_archive_file(
 	State(state): State<Arc<AppState>>,
 	_auth: ApiKeyAuth,
 	Path(edition): Path<String>,
 	if_modified_since: Option<TypedHeader<IfModifiedSince>>,
 ) -> Result<axum::response::Response, ErrorDTO> {
-	let info = state.maxmind.get_archive(&edition)?;
+	let info = match state.maxmind.get_archive(&edition) {
+		Ok(info) => Ok(info),
+		Err(MaxMindServiceError::UnknownEdition | MaxMindServiceError::MissingDatabase) => {
+			Err(ErrorDTO::new_static(
+				StatusCode::NOT_FOUND,
+				"File not found",
+			))
+		},
+		Err(err) => Err(err.into()),
+	}?;
 	let res = state.files.download_archive(
-		info, 
+		info,
 		&format!("{}.tar.gz", edition),
 		if_modified_since,
 	).await?;

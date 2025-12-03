@@ -23,6 +23,7 @@ Demo: https://geoip.quoi.dev/
 - Endpoint exposing list of timezone mappings to
   POSIX spec strings
 - Automatic updates of timezone database
+- Serve latest timezone database archive
 - Fancy Web UI with service status and manual GeoIP lookups
 - OpenStreetMap integration for Web UI
 - Protect Web UI with Recaptcha v3
@@ -54,13 +55,16 @@ GeoIP service on http://localhost:8080/.
 - `GET /api/ip` - Detect requester IP.
 - `GET /api/geoip` - Perform GeoIP lookup.
   Can be protected with API key.
+- `GET /api/timezones` - Get all known timezone mappings from
+  ids to POSIX specification (useful for embedded systems
+  without timezone database). Can be protected with API key.
 - `GET /files/mmdb/{edition}` - Download latest MMDB database
   compressed into `tar.gz`, supports `If-Modified-Since` header.
   Can be used as `MAXMIND_DOWNLOAD_URL` for other instances.
   Can be protected with API key.
-- `GET /api/timezones` - Get all known timezone mappings from
-  ids to POSIX specification (useful for embedded systems
-  without timezone database). Can be protected with API key.
+- `GET /files/tzdata` - Download latest timezone database
+  compressed into `tar.gz`, supports `If-Modified-Since` header.
+  Can be protected with API key.
 
 Swagger UI available on `/swagger-ui`,
 OpenAPI specification available on `/api/docs`.
