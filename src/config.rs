@@ -6,6 +6,7 @@ use std::sync::Arc;
 const DEFAULT_EDITIONS: &str = "GeoLite2-City";
 pub const DOWNLOAD_URL_EDITION_PLACEHOLDER: &str = "{edition}";
 const DOWNLOAD_URL: &str = "https://download.maxmind.com/geoip/databases/{edition}/download?suffix=tar.gz";
+const TZDATA_DOWNLOAD_URL: &str = "https://data.iana.org/time-zones/tzdata-latest.tar.gz";
 
 pub struct AppConfig {
 	pub listen_addr: SocketAddr,
@@ -21,6 +22,10 @@ pub struct AppConfig {
 	pub recaptcha_site_key: Option<String>,
 	pub recaptcha_secret_key: Option<String>,
 	pub osm_tiles_url: Option<String>,
+	pub tzdata_auto_update_interval: Option<u64>,
+	pub tzdata_download_url: String,
+	pub tzdata_bearer_token: Option<String>,
+	pub zic_path: Option<String>,
 }
 
 impl AppConfig {
@@ -53,6 +58,14 @@ impl AppConfig {
 		let recaptcha_site_key = env::var("RECAPTCHA_SITE_KEY").ok();
 		let recaptcha_secret_key = env::var("RECAPTCHA_SECRET_KEY").ok();
 		let osm_tiles_url = env::var("OSM_TILES_URL").ok();
+		let tzdata_auto_update_interval = env::var("TZDATA_AUTO_UPDATE_INTERVAL").ok()
+			.unwrap_or_else(|| "24".to_owned())
+			.parse()
+			.expect("TZDATA_AUTO_UPDATE_INTERVAL must be a valid integer");
+		let tzdata_download_url = env::var("TZDATA_DOWNLOAD_URL").ok()
+			.unwrap_or_else(|| TZDATA_DOWNLOAD_URL.to_owned());
+		let tzdata_bearer_token = env::var("TZDATA_BEARER_TOKEN").ok();
+		let zic_path = env::var("ZIC_PATH").ok();
 		
 		Arc::new(Self {
 			listen_addr,
@@ -68,6 +81,10 @@ impl AppConfig {
 			recaptcha_site_key,
 			recaptcha_secret_key,
 			osm_tiles_url,
+			tzdata_auto_update_interval: Some(tzdata_auto_update_interval).filter(|i| *i > 0),
+			tzdata_download_url,
+			tzdata_bearer_token,
+			zic_path,
 		})
 	}
 }

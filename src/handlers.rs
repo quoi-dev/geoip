@@ -1,18 +1,17 @@
 use std::sync::Arc;
-use std::time::{Instant, SystemTime};
+use std::time::Instant;
 use ahash::AHashMap;
 use axum::extract::{Path, Query, State};
 use axum::{middleware, Json, Router};
 use axum::body::{Body, Bytes};
-use axum::http::{header, Request, Response, StatusCode};
+use axum::http::{Request, Response, StatusCode};
 use axum::middleware::Next;
 use axum::response::{Html, IntoResponse};
 use axum::routing::get;
-use axum_extra::headers::{ContentLength, ContentType, IfModifiedSince, LastModified};
+use axum_extra::headers::IfModifiedSince;
 use axum_extra::TypedHeader;
 use log::error;
 use metrics::histogram;
-use tokio::io::AsyncReadExt;
 use tower_http::services::{ServeDir, ServeFile};
 use utoipa_swagger_ui::SwaggerUi;
 use crate::extractors::{ApiKeyAuth, ApiKeyOrRecaptchaAuth, ClientIp};
@@ -71,43 +70,13 @@ async fn download_mmdb_archive_file(
 	Path(edition): Path<String>,
 	if_modified_since: Option<TypedHeader<IfModifiedSince>>,
 ) -> Result<axum::response::Response, ErrorDTO> {
-	let (path, mtime, handle) = state.maxmind.get_edition_path_and_mtime(&edition)
-		.ok_or(ErrorDTO::new_static(StatusCode::NOT_FOUND, "Not found"))?;
-	if let Some(if_modified_since) = if_modified_since {
-		if !if_modified_since.is_modified(mtime.into()) {
-			return Ok((
-				StatusCode::NOT_MODIFIED,
-				TypedHeader(LastModified::from(SystemTime::from(mtime))),
-			).into_response());
-		}
-	}
-	let path = path.with_extension("tar.gz");
-	let file = tokio::fs::File::open(&path).await?;
-	let metadata = file.metadata().await?;
-	let len = metadata.len();
-	let stream = Body::from_stream(futures::stream::unfold(
-		Some((file, handle)),
-		|state| async move {
-			let (mut file, handle) = state?;
-			let mut buf = [0u8; 8192];
-			match file.read(&mut buf).await {
-				Ok(0) => None,
-				Ok(count) => {
-					let bytes = Bytes::copy_from_slice(&buf[..count]);
-					Some((Ok(bytes), Some((file, handle))))
-				},
-				Err(err) => Some((Err(err), None))
-			}
-		}
-	));
-	Ok((
-		StatusCode::OK,
-		[(header::CONTENT_DISPOSITION, format!("attachment; filename=\"{edition}.tar.gz\""))],
-		TypedHeader(LastModified::from(SystemTime::from(mtime))),
-		TypedHeader(ContentType::octet_stream()),
-		TypedHeader(ContentLength(len)),
-		stream,
-	).into_response())
+	let info = state.maxmind.get_archive(&edition)?;
+	let res = state.files.download_archive(
+		info, 
+		&format!("{}.tar.gz", edition),
+		if_modified_since,
+	).await?;
+	Ok(res)
 }
 
 async fn detect_ip(ClientIp(client_ip): ClientIp) -> Json<IpDetectResult> {

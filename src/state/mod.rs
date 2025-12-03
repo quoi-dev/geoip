@@ -2,11 +2,13 @@ mod maxmind;
 mod templates;
 mod recaptcha;
 mod timezones;
+mod files;
 
 pub use maxmind::*;
 pub use templates::*;
 pub use recaptcha::*;
 pub use timezones::*;
+pub use files::*;
 
 use std::sync::Arc;
 use reqwest::Client;
@@ -19,17 +21,19 @@ pub struct AppState {
 	pub maxmind: Arc<MaxMindService>,
 	pub templates: Arc<TemplateService>,
 	pub recaptcha: Arc<RecaptchaService>,
+	pub files: Arc<FileService>,
 }
 
 impl AppState {
-	pub fn new(config: Arc<AppConfig>) -> Arc<Self> {
+	pub async fn new(config: Arc<AppConfig>) -> Arc<Self> {
 		let client = Client::new();
-		let timezones = TimezoneService::new();
+		let files = FileService::new(config.clone(), client.clone()).await;
+		let timezones = TimezoneService::new(config.clone(), files.clone()).await;
 		let maxmind = MaxMindService::new(
-			config.clone(), 
-			client.clone(),
+			config.clone(),
+			files.clone(),
 			timezones.clone(),
-		);
+		).await;
 		let templates = TemplateService::new(config.clone());
 		let recaptcha = RecaptchaService::new(config.clone(), client.clone());
 		
@@ -40,6 +44,7 @@ impl AppState {
 			maxmind,
 			templates,
 			recaptcha,
+			files,
 		})
 	}
 }

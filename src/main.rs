@@ -16,7 +16,8 @@ async fn main() {
 	let _ = dotenvy::dotenv();
 	env_logger::init_from_env(env_logger::Env::default().default_filter_or("info"));
 	let config = AppConfig::load_from_env();
-	let state = AppState::new(config.clone());
+	let state = AppState::new(config.clone()).await;
+	state.timezones.start_updater();
 	state.maxmind.start_updater();
 	let router = build_router(state.clone());
 	let listener = TcpListener::bind(config.listen_addr)

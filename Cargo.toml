@@ -8,7 +8,7 @@ dotenvy = "0.15"
 log = "0.4"
 env_logger = "0.11"
 thiserror = "2"
-tokio = { version = "1", features = ["macros", "fs", "rt-multi-thread"] }
+tokio = { version = "1", features = ["macros", "fs", "process", "rt-multi-thread"] }
 axum = { version = "0.8", features = ["macros"] }
 axum-extra = { version = "0.12", features = ["typed-header"] }
 arc-swap = "1.7"
@@ -31,3 +31,5 @@ handlebars = "6.3"
 constant_time_eq = "0.4"
 futures = "0.3"
 httpdate = "1"
+which = "8"
+im = "15.1"

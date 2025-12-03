@@ -22,6 +22,7 @@ Demo: https://geoip.quoi.dev/
   e.g. ESP32 and other newlib targets)
 - Endpoint exposing list of timezone mappings to
   POSIX spec strings
+- Automatic updates of timezone database
 - Fancy Web UI with service status and manual GeoIP lookups
 - OpenStreetMap integration for Web UI
 - Protect Web UI with Recaptcha v3
@@ -101,10 +102,25 @@ OpenAPI specification available on `/api/docs`.
 - `OSM_TILES_URL` (optional) - Render OpenStreetMap centered on detected location.
   You can use `https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png` as a starting point
   and switch to your own tile server if traffic increases.
+- `TZDATA_AUTO_UPDATE_INTERVAL` (optional) - Timezone database
+  auto-update interval in hours. Defaults to 24, if zero disables
+  tzdata auto-update.
+- `TZDATA_DOWNLOAD_URL` (optional) - Timezone database download
+  url. Defaults to `https://data.iana.org/time-zones/tzdata-latest.tar.gz`.
+- `TZDATA_BEARER_TOKEN` (optional) - Bearer token used for 
+  timezone database download. You don't need it
+  if you're using default download url.
+- `ZIC_PATH` (optional) - Timezone database compiler executable path.
+  GeoIP service tries to use system compiler (`zic` command),
+  but it might fail to find it on some systems (e.g. Alpine 
+  without `tzdata` package or Windows). In this case timezone
+  database auto-updates will be disabled, but you can specify
+  `zic` executable path override and re-enable auto-updates.
 
 If `MAXMIND_ACCOUNT_ID` or `MAXMIND_DOWNLOAD_URL` are set, 
-automatic updates are enabled, otherwise you need to download,
-extract and place `mmdb` files to `DATA_DIR` by hand.
+GeoIP database automatic updates enabled, otherwise 
+you need to download, extract and place `mmdb` files to
+`DATA_DIR` by hand.
 
 File names must have format `{edition}-{datetime}.mmdb`.
 Example: `GeoLite2-City-20251125154543.mmdb`.

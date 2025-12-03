@@ -61,7 +61,7 @@ FROM alpine AS runtime
 WORKDIR /opt/app
 
 RUN apk update
-RUN apk add --no-cache libgcc libressl tzdata
+RUN apk add --no-cache libgcc libressl tzdata tzdata-utils
 
 ENV USER=appuser
 ENV UID=10001
