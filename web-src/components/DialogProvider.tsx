@@ -67,7 +67,7 @@ export const DialogProvider: React.FC<PropsWithChildren> = ({children}) => {
 			{
 				items.map(({id, component: Component, props, callback, closed}) => (
 					<Component
-						id={id}
+						key={id}
 						{...props}
 						shown={!closed}
 						onClose={callback}
