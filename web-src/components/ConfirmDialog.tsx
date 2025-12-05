@@ -12,15 +12,15 @@ export interface ConfirmDialogProps extends ManagedDialogProps<boolean> {
 }
 
 export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
-	title,
-	message,
-	messageHtml,
-	primaryButton,
-	primaryButtonClassName,
-	cancelButton,
-	shown,
-	onClose,
-}) => {
+																title,
+																message,
+																messageHtml,
+																primaryButton,
+																primaryButtonClassName,
+																cancelButton,
+																shown,
+																onClose,
+															}) => {
 	const handlePrimaryButtonClick = useCallback(() => {
 		onClose?.(true);
 	}, [onClose]);
@@ -39,7 +39,9 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
 			onPrimaryButtonClick={handlePrimaryButtonClick}
 			cancelButton={cancelButton}
 		>
-			{message?.split("\n").map(line => (<p className="text-justify">{line}</p>))}
+			{message?.split("\n").map((line, i) => (
+				<p key={i} className="text-justify">{line}</p>
+			))}
 			{messageHtml !== undefined && (
 				<p className="text-justify" dangerouslySetInnerHTML={{__html: messageHtml}} />
 			)}
